@@ -24,7 +24,7 @@
     "json-to-graphql-query": "^2.2.4",
     "mysql": "^2.18.1",
     "pino": "^8.0.0",
-    "pino-pretty": "^7.6.1",
+    "pino-pretty": "^8.1.0",
     "starknet": "^3.7.0"
   },
   "devDependencies": {
