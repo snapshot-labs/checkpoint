@@ -13,7 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@graphql-tools/schema": "^8.3.13",
+    "@graphql-tools/schema": "^8.5.0",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
     "dotenv": "^16.0.1",
