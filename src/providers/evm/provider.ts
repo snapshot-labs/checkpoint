@@ -1,4 +1,3 @@
-import { Interface, LogDescription } from '@ethersproject/abi';
 import {
   createPublicClient,
   formatLog,
@@ -6,6 +5,8 @@ import {
   http,
   keccak256,
   Log,
+  parseEventLogs,
+  ParseEventLogsReturnType,
   PublicClient,
   RpcLog,
   stringToBytes
@@ -240,11 +241,15 @@ export class EvmProvider extends BaseProvider {
                 'found contract event'
               );
 
-              let parsedEvent: LogDescription | undefined;
+              let parsedEvent: ParseEventLogsReturnType[number] | undefined;
               if (source.abi && this.abis?.[source.abi]) {
-                const iface = new Interface(this.abis[source.abi]);
                 try {
-                  parsedEvent = iface.parseLog(log);
+                  const parsedLogs = parseEventLogs({
+                    abi: this.abis[source.abi],
+                    logs: [log]
+                  });
+                  parsedEvent =
+                    parsedLogs[0] as ParseEventLogsReturnType[number];
                 } catch (err) {
                   this.log.warn(
                     {

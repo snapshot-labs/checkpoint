@@ -19,8 +19,6 @@
   },
   "prettier": "@snapshot-labs/prettier-config",
   "dependencies": {
-    "@ethersproject/abi": "^5.7.0",
-    "@ethersproject/providers": "^5.7.2",
     "@graphql-tools/schema": "^8.5.1",
     "@starknet-io/types-js": "^0.7.10",
     "connection-string": "^4.3.5",
