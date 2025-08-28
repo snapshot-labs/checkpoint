@@ -433,6 +433,11 @@ export class EvmProvider extends BaseProvider {
         });
 
         if (rangeHint) {
+          this.log.warn(
+            { err, rangeHint, fromBlock: currentFrom, toBlock: currentTo },
+            'getLogs failed. Received new range hint'
+          );
+
           currentFrom = rangeHint.from;
           currentTo = rangeHint.to;
           continue;
