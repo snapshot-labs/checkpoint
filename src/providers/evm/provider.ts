@@ -1,13 +1,11 @@
 import { Interface, LogDescription } from '@ethersproject/abi';
-import { getAddress } from '@ethersproject/address';
-import { keccak256 } from '@ethersproject/keccak256';
 import {
   Formatter,
   Log,
   Provider,
   StaticJsonRpcProvider
 } from '@ethersproject/providers';
-import { toUtf8Bytes } from '@ethersproject/strings';
+import { getAddress, keccak256, stringToBytes } from 'viem';
 import { getRangeHint } from './helpers';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
@@ -506,7 +504,7 @@ export class EvmProvider extends BaseProvider {
 
   getEventHash(eventName: string) {
     if (!this.sourceHashes.has(eventName)) {
-      this.sourceHashes.set(eventName, keccak256(toUtf8Bytes(eventName)));
+      this.sourceHashes.set(eventName, keccak256(stringToBytes(eventName)));
     }
 
     return this.sourceHashes.get(eventName) as string;
