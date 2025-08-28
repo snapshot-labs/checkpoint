@@ -1,5 +1,6 @@
 import { LogDescription } from '@ethersproject/abi';
-import { Log, Provider } from '@ethersproject/providers';
+import { Log } from '@ethersproject/providers';
+import { GetBlockReturnType } from 'viem';
 import { BaseWriterParams } from '../../types';
 
 export class CustomJsonRpcError extends Error {
@@ -22,7 +23,7 @@ export type EventsData = {
   events: Record<string, Log[]>;
 };
 
-export type Block = Awaited<ReturnType<Provider['getBlock']>>;
+export type Block = GetBlockReturnType;
 
 export type Writer = (
   args: {

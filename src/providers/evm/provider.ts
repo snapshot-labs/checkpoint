@@ -1,11 +1,13 @@
 import { Interface, LogDescription } from '@ethersproject/abi';
+import { Formatter, Log } from '@ethersproject/providers';
 import {
-  Formatter,
-  Log,
-  Provider,
-  StaticJsonRpcProvider
-} from '@ethersproject/providers';
-import { getAddress, keccak256, stringToBytes } from 'viem';
+  createPublicClient,
+  getAddress,
+  http,
+  keccak256,
+  PublicClient,
+  stringToBytes
+} from 'viem';
 import { getRangeHint } from './helpers';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
@@ -22,10 +24,16 @@ type GetLogsBlockRangeFilter = {
   toBlock: number;
 };
 
+/**
+ * Timeout for client requests in milliseconds.
+ */
+const CLIENT_TIMEOUT = 5 * 1000;
+
 const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
-  private readonly provider: Provider;
+  private readonly client: PublicClient;
+
   /**
    * Formatter instance from ethers.js used to format raw responses.
    */
@@ -44,9 +52,12 @@ export class EvmProvider extends BaseProvider {
   }) {
     super({ instance, log, abis });
 
-    this.provider = new StaticJsonRpcProvider(
-      this.instance.config.network_node_url
-    );
+    this.client = createPublicClient({
+      transport: http(instance.config.network_node_url, {
+        timeout: CLIENT_TIMEOUT
+      })
+    });
+
     this.writers = writers;
   }
 
@@ -55,76 +66,78 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getNetworkIdentifier(): Promise<string> {
-    const result = await this.provider.getNetwork();
-    return `evm_${result.chainId}`;
+    const chainId = await this.client.getChainId();
+
+    return `evm_${chainId}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    return this.provider.getBlockNumber();
+    const blockNumber = await this.client.getBlockNumber();
+
+    return Number(blockNumber);
   }
 
   async getBlockHash(blockNumber: number) {
-    const block = await this.provider.getBlock(blockNumber);
+    const block = await this.client.getBlock({
+      blockNumber: BigInt(blockNumber)
+    });
+
     return block.hash;
   }
 
-  async processBlock(blockNum: number, parentHash: string | null) {
+  async processBlock(blockNumber: number, parentHash: string | null) {
     let block: Block | null = null;
     let eventsData: EventsData;
 
     const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
     const hasPreloadedBlockEvents =
-      skipBlockFetching && this.logsCache.has(blockNum);
+      skipBlockFetching && this.logsCache.has(blockNumber);
 
     try {
       if (!hasPreloadedBlockEvents) {
-        block = await this.provider.getBlock(blockNum);
+        block = await this.client.getBlock({
+          blockNumber: BigInt(blockNumber)
+        });
       }
-    } catch (e) {
-      this.log.error(
-        { blockNumber: blockNum, err: e },
-        'getting block failed... retrying'
-      );
-      throw e;
+    } catch (err) {
+      this.log.error({ blockNumber, err }, 'getting block failed... retrying');
+      throw err;
     }
 
     if (!hasPreloadedBlockEvents && block === null) {
-      this.log.info({ blockNumber: blockNum }, 'block not found');
+      this.log.info({ blockNumber }, 'block not found');
       throw new BlockNotFoundError();
     }
 
     try {
       eventsData = await this.getEvents({
-        blockNumber: blockNum,
+        blockNumber,
         blockHash: block?.hash ?? null
       });
-    } catch (e: unknown) {
-      if (e instanceof CustomJsonRpcError && e.code === -32000) {
-        this.log.info({ blockNumber: blockNum }, 'block events not found');
+    } catch (err: unknown) {
+      if (err instanceof CustomJsonRpcError && err.code === -32000) {
+        this.log.info({ blockNumber }, 'block events not found');
         throw new BlockNotFoundError();
       }
 
-      this.log.error(
-        { blockNumber: blockNum, err: e },
-        'getting events failed... retrying'
-      );
-      throw e;
+      this.log.error({ blockNumber, err }, 'getting events failed... retrying');
+      throw err;
     }
 
     if (block && parentHash && block.parentHash !== parentHash) {
-      this.log.error({ blockNumber: blockNum }, 'reorg detected');
+      this.log.error({ blockNumber }, 'reorg detected');
       throw new ReorgDetectedError();
     }
 
-    await this.handleBlock(blockNum, block, eventsData);
+    await this.handleBlock(blockNumber, block, eventsData);
 
     if (block) {
-      await this.instance.setBlockHash(blockNum, block.hash);
+      await this.instance.setBlockHash(blockNumber, block.hash);
     }
 
-    await this.instance.setLastIndexedBlock(blockNum);
+    await this.instance.setLastIndexedBlock(blockNumber);
 
-    return blockNum + 1;
+    return blockNumber + 1;
   }
 
   private async handleBlock(
@@ -158,7 +171,7 @@ export class EvmProvider extends BaseProvider {
   ) {
     this.log.debug({ txId }, 'handling transaction');
 
-    const helpers = await this.instance.getWriterHelpers();
+    const helpers = this.instance.getWriterHelpers();
 
     if (this.instance.config.tx_fn) {
       await this.writers[this.instance.config.tx_fn]({
