@@ -38,7 +38,9 @@ type Vote {
       }
     ])('should fail for $reason', ({ schema }) => {
       const controller = new GqlEntityController(schema);
-      expect(() => controller.generateQueryFields()).toThrowErrorMatchingSnapshot();
+      expect(() =>
+        controller.generateQueryFields()
+      ).toThrowErrorMatchingSnapshot();
     });
   });
 

@@ -1,5 +1,5 @@
 import knex from 'knex';
-import { getTableName, applyQueryFilter } from '../../../src/utils/database';
+import { applyQueryFilter, getTableName } from '../../../src/utils/database';
 
 const mockKnex = knex({
   client: 'sqlite3',
@@ -34,7 +34,10 @@ describe('applyQueryFilter', () => {
   it('should not apply block filter filter for internal tables', () => {
     const query = mockKnex.select('*').from('_metadatas');
 
-    const result = applyQueryFilter(query, '_metadatas', { block: 123, indexer: 'indexer' });
+    const result = applyQueryFilter(query, '_metadatas', {
+      block: 123,
+      indexer: 'indexer'
+    });
 
     expect(result.toString()).toBe(
       "select * from `_metadatas` where `_metadatas`.`indexer` = 'indexer'"
@@ -44,7 +47,10 @@ describe('applyQueryFilter', () => {
   it('should apply capped block filter if block is provided', () => {
     const query = mockKnex.select('*').from('posts');
 
-    const result = applyQueryFilter(query, 'posts', { block: 123, indexer: 'indexer' });
+    const result = applyQueryFilter(query, 'posts', {
+      block: 123,
+      indexer: 'indexer'
+    });
 
     expect(result.toString()).toBe(
       "select * from `posts` where posts.block_range @> int8(123) and `posts`.`_indexer` = 'indexer'"
@@ -66,6 +72,8 @@ describe('applyQueryFilter', () => {
 
     const result = applyQueryFilter(query, 'posts', {});
 
-    expect(result.toString()).toBe('select * from `posts` where upper_inf(posts.block_range)');
+    expect(result.toString()).toBe(
+      'select * from `posts` where upper_inf(posts.block_range)'
+    );
   });
 });

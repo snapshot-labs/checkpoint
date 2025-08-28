@@ -30,7 +30,8 @@ export function getRangeHint(err: unknown, currentRange: Range): Range | null {
     // We have no range in the error data, so we return the current range, but half as long
     return {
       from: currentRange.from,
-      to: currentRange.from + Math.ceil((currentRange.to - currentRange.from) / 2)
+      to:
+        currentRange.from + Math.ceil((currentRange.to - currentRange.from) / 2)
     };
   }
 

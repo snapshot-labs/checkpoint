@@ -31,26 +31,37 @@ export const spaceDeployedEvent = {
     '0x34367363356162767a6f6c6f6864343666717a6d71616b6e6f337467716c36',
     '0x32686669'
   ],
-  from_address: '0xe1e511e496a72791ab3d591ba7d571a32de4261d84e4d183f26b6325970e20',
+  from_address:
+    '0xe1e511e496a72791ab3d591ba7d571a32de4261d84e4d183f26b6325970e20',
   keys: ['0xfb483ab6758cfd02170a30e08181f6e7397c1a32c2966ce3a8c4702b7ec142']
 };
 
 export const voteCreatedEvent = {
-  data: ['0x8', '0xef8305e140ac520225daf050e2f71d5fbcc543e7', '0x1', '0x1', '0x0'],
-  from_address: '0x750118894bf8b3ad7fd79763899c4528b2a7a0c17d7185dff78eaddbff2cb0b',
+  data: [
+    '0x8',
+    '0xef8305e140ac520225daf050e2f71d5fbcc543e7',
+    '0x1',
+    '0x1',
+    '0x0'
+  ],
+  from_address:
+    '0x750118894bf8b3ad7fd79763899c4528b2a7a0c17d7185dff78eaddbff2cb0b',
   keys: ['0x35a0a3a79d25118031c4960817fe040fe30a9d229c30e63c993a5bfee52d32b']
 };
 
 export const spaceDeployedEventCairo1 = {
-  block_hash: '0x8c069e00a34ae275efe05b4b5f9395d615f9caf003c4a0d0576c225a95d673',
+  block_hash:
+    '0x8c069e00a34ae275efe05b4b5f9395d615f9caf003c4a0d0576c225a95d673',
   block_number: 114,
   data: [
     '0x7b52be32f53235445c94247942b516cb9f8ace110c82ca8a72af527eb7d44b0',
     '0x40279a6371314c37464ebc327856a2d332b89022109f55b9ee93179bbbe727a'
   ],
-  from_address: '0x6838e761bc2e07c9563251a03a60b9a013f2d36b73246fc9d850932ac519696',
+  from_address:
+    '0x6838e761bc2e07c9563251a03a60b9a013f2d36b73246fc9d850932ac519696',
   keys: ['0x2d8cd3e2509f757328c6abf59278c05024d30ae28426655f886b32be3eeaa9f'],
-  transaction_hash: '0x569e2dac76352ea03888e9ff3135374e87124324ce22ce98ab5d16f922cc33e'
+  transaction_hash:
+    '0x569e2dac76352ea03888e9ff3135374e87124324ce22ce98ab5d16f922cc33e'
 };
 
 export const spaceFactoryAbi = [

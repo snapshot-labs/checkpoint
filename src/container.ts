@@ -1,13 +1,27 @@
-import { BaseIndexer, BlockNotFoundError, Instance, ReorgDetectedError } from './providers';
-import { CheckpointConfig, CheckpointOptions, ContractSourceConfig, TemplateSource } from './types';
-import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { Logger } from './utils/logger';
-import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
-import { GqlEntityController } from './graphql/controller';
 import { Knex } from 'knex';
-import { sleep } from './utils/helpers';
+import { GqlEntityController } from './graphql/controller';
+import {
+  BaseIndexer,
+  BlockNotFoundError,
+  Instance,
+  ReorgDetectedError
+} from './providers';
 import { register } from './register';
+import {
+  CheckpointRecord,
+  CheckpointsStore,
+  MetadataId
+} from './stores/checkpoints';
+import {
+  CheckpointConfig,
+  CheckpointOptions,
+  ContractSourceConfig,
+  TemplateSource
+} from './types';
+import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { getTableName } from './utils/database';
+import { sleep } from './utils/helpers';
+import { Logger } from './utils/logger';
 
 const SCHEMA_VERSION = 1;
 
@@ -71,7 +85,9 @@ export class Container implements Instance {
   }
 
   public get sourceContracts() {
-    return this.indexer.getProvider().formatAddresses(getContractsFromConfig(this.config));
+    return this.indexer
+      .getProvider()
+      .formatAddresses(getContractsFromConfig(this.config));
   }
 
   public getCurrentSources(blockNumber: number) {
@@ -80,7 +96,9 @@ export class Container implements Instance {
     return this.config.sources.filter(source => source.start <= blockNumber);
   }
 
-  private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
+  private async getNextCheckpointBlock(
+    blockNum: number
+  ): Promise<number | null> {
     if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
       return this.cpBlocksCache.shift() || null;
     }
@@ -99,7 +117,10 @@ export class Container implements Instance {
   }
 
   private async getBlockHash(blockNumber: number): Promise<string | null> {
-    if (this.blockHashCache && this.blockHashCache.blockNumber === blockNumber) {
+    if (
+      this.blockHashCache &&
+      this.blockHashCache.blockNumber === blockNumber
+    ) {
       return this.blockHashCache.hash;
     }
 
@@ -133,10 +154,19 @@ export class Container implements Instance {
     );
 
     if (existingTemplate) return;
-    this.activeTemplates.push({ template: name, contractAddress: contract, startBlock: start });
+    this.activeTemplates.push({
+      template: name,
+      contractAddress: contract,
+      startBlock: start
+    });
 
     if (persist) {
-      await this.store.insertTemplateSource(this.indexerName, contract, start, name);
+      await this.store.insertTemplateSource(
+        this.indexerName,
+        contract,
+        start,
+        name
+      );
     }
 
     this.addSource({
@@ -160,7 +190,11 @@ export class Container implements Instance {
   }
 
   public async setLastIndexedBlock(block: number) {
-    await this.store.setMetadata(this.indexerName, MetadataId.LastIndexedBlock, block);
+    await this.store.setMetadata(
+      this.indexerName,
+      MetadataId.LastIndexedBlock,
+      block
+    );
   }
 
   public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
@@ -177,7 +211,9 @@ export class Container implements Instance {
   public async start() {
     await this.validateStore();
 
-    const templateSources = await this.store.getTemplateSources(this.indexerName);
+    const templateSources = await this.store.getTemplateSources(
+      this.indexerName
+    );
     await Promise.all(
       templateSources.map(source =>
         this.executeTemplate(
@@ -193,22 +229,32 @@ export class Container implements Instance {
 
     const blockNum = await this.getStartBlockNum();
     this.preloadEndBlock =
-      (await this.indexer.getProvider().getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
+      (await this.indexer.getProvider().getLatestBlockNumber()) -
+      BLOCK_PRELOAD_OFFSET;
 
     return this.process(blockNum);
   }
 
   private async preload(blockNum: number) {
-    if (this.preloadedBlocks.length > 0) return this.preloadedBlocks.shift() as number;
+    if (this.preloadedBlocks.length > 0)
+      return this.preloadedBlocks.shift() as number;
 
     let currentBlock = blockNum;
 
     while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
+      const endBlock = Math.min(
+        currentBlock + this.preloadStep,
+        this.preloadEndBlock
+      );
       let checkpoints: CheckpointRecord[];
       try {
-        this.log.info({ start: currentBlock, end: endBlock }, 'preloading blocks');
-        checkpoints = await this.indexer.getProvider().getCheckpointsRange(currentBlock, endBlock);
+        this.log.info(
+          { start: currentBlock, end: endBlock },
+          'preloading blocks'
+        );
+        checkpoints = await this.indexer
+          .getProvider()
+          .getCheckpointsRange(currentBlock, endBlock);
       } catch (e) {
         this.log.error(
           { blockNumber: currentBlock, err: e },
@@ -219,12 +265,19 @@ export class Container implements Instance {
       }
 
       const increase =
-        checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
-      this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
+        checkpoints.length > BLOCK_PRELOAD_TARGET
+          ? -BLOCK_PRELOAD_STEP
+          : +BLOCK_PRELOAD_STEP;
+      this.preloadStep = Math.max(
+        BLOCK_RELOAD_MIN_RANGE,
+        this.preloadStep + increase
+      );
 
       if (checkpoints.length > 0) {
         this.preloadedBlocks = [
-          ...new Set(checkpoints.map(cp => cp.blockNumber).sort((a, b) => a - b))
+          ...new Set(
+            checkpoints.map(cp => cp.blockNumber).sort((a, b) => a - b)
+          )
         ];
         return this.preloadedBlocks.shift() as number;
       }
@@ -256,7 +309,9 @@ export class Container implements Instance {
       if (!checkpointBlock && !preloadedBlock) {
         if (blockNumber % CHECK_LATEST_BLOCK_INTERVAL === 0) {
           try {
-            const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
+            const latestBlock = await this.indexer
+              .getProvider()
+              .getLatestBlockNumber();
 
             this.log.info(
               { latestBlock, behind: latestBlock - blockNumber },
@@ -341,8 +396,13 @@ export class Container implements Instance {
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
       try {
-        const storedBlockHash = await this.store.getBlockHash(this.indexerName, current);
-        const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
+        const storedBlockHash = await this.store.getBlockHash(
+          this.indexerName,
+          current
+        );
+        const currentBlockHash = await this.indexer
+          .getProvider()
+          .getBlockHash(current);
 
         if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
           lastGoodBlock = current;
@@ -350,13 +410,18 @@ export class Container implements Instance {
           current -= 1;
         }
       } catch (e) {
-        this.log.error({ blockNumber: current, err: e }, 'error occurred during block hash check');
+        this.log.error(
+          { blockNumber: current, err: e },
+          'error occurred during block hash check'
+        );
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
       }
     }
 
     const entities = await this.entityController.schemaObjects;
-    const tables = entities.map(entity => getTableName(entity.name.toLowerCase()));
+    const tables = entities.map(entity =>
+      getTableName(entity.name.toLowerCase())
+    );
 
     await this.knex.transaction(async trx => {
       for (const tableName of tables) {
@@ -388,13 +453,25 @@ export class Container implements Instance {
   }
 
   public async reset() {
-    await this.store.setMetadata(this.indexerName, MetadataId.LastIndexedBlock, 0);
-    await this.store.setMetadata(this.indexerName, MetadataId.SchemaVersion, SCHEMA_VERSION);
+    await this.store.setMetadata(
+      this.indexerName,
+      MetadataId.LastIndexedBlock,
+      0
+    );
+    await this.store.setMetadata(
+      this.indexerName,
+      MetadataId.SchemaVersion,
+      SCHEMA_VERSION
+    );
     await this.store.removeBlocks(this.indexerName);
   }
 
   public async resetMetadata() {
-    await this.store.setMetadata(this.indexerName, MetadataId.SchemaVersion, SCHEMA_VERSION);
+    await this.store.setMetadata(
+      this.indexerName,
+      MetadataId.SchemaVersion,
+      SCHEMA_VERSION
+    );
   }
 
   /**
@@ -430,13 +507,18 @@ export class Container implements Instance {
       return this.config.start;
     }
 
-    return Math.min(...(this.config.sources?.map(source => source.start) || []));
+    return Math.min(
+      ...(this.config.sources?.map(source => source.start) || [])
+    );
   }
 
   public async getStartBlockNum() {
     const start = this.getConfigStartBlock();
     const lastBlock =
-      (await this.store.getMetadataNumber(this.indexerName, MetadataId.LastIndexedBlock)) ?? 0;
+      (await this.store.getMetadataNumber(
+        this.indexerName,
+        MetadataId.LastIndexedBlock
+      )) ?? 0;
 
     const nextBlock = lastBlock + 1;
 
@@ -477,7 +559,9 @@ export class Container implements Instance {
   }
 
   public async validateStore() {
-    const networkIdentifier = await this.indexer.getProvider().getNetworkIdentifier();
+    const networkIdentifier = await this.indexer
+      .getProvider()
+      .getNetworkIdentifier();
     const configChecksum = getConfigChecksum(this.config);
 
     const storedNetworkIdentifier = await this.store.getMetadata(
@@ -501,11 +585,15 @@ export class Container implements Instance {
       storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
     const hasStartBlockChanged =
       storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
-    const hasConfigChanged = storedConfigChecksum && storedConfigChecksum !== configChecksum;
+    const hasConfigChanged =
+      storedConfigChecksum && storedConfigChecksum !== configChecksum;
     const hasSchemaChanged = storedSchemaVersion !== SCHEMA_VERSION;
 
     if (
-      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged || hasSchemaChanged) &&
+      (hasNetworkChanged ||
+        hasStartBlockChanged ||
+        hasConfigChanged ||
+        hasSchemaChanged) &&
       this.opts?.resetOnConfigChange
     ) {
       await this.resetMetadata();
@@ -521,7 +609,11 @@ export class Container implements Instance {
         MetadataId.StartBlock,
         this.getConfigStartBlock()
       );
-      await this.store.setMetadata(this.indexerName, MetadataId.ConfigChecksum, configChecksum);
+      await this.store.setMetadata(
+        this.indexerName,
+        MetadataId.ConfigChecksum,
+        configChecksum
+      );
     } else if (hasNetworkChanged) {
       this.log.error(
         `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
@@ -572,7 +664,11 @@ export class Container implements Instance {
       }
 
       if (!storedConfigChecksum) {
-        await this.store.setMetadata(this.indexerName, MetadataId.ConfigChecksum, configChecksum);
+        await this.store.setMetadata(
+          this.indexerName,
+          MetadataId.ConfigChecksum,
+          configChecksum
+        );
       }
     }
   }

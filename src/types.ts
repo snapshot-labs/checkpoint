@@ -1,13 +1,13 @@
 import pino from 'pino';
 import { z } from 'zod';
-import { LogLevel } from './utils/logger';
+import { Instance } from './providers';
 import {
+  checkpointConfigSchema,
   contractSourceConfigSchema,
   contractTemplateSchema,
-  checkpointConfigSchema,
   overridesConfigSchema
 } from './schemas';
-import { Instance } from './providers';
+import { LogLevel } from './utils/logger';
 
 export type TemplateSource = {
   contractAddress: string;

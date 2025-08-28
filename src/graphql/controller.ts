@@ -1,3 +1,4 @@
+import { addResolversToSchema } from '@graphql-tools/schema';
 import {
   buildSchema,
   GraphQLEnumType,
@@ -23,18 +24,17 @@ import {
 } from 'graphql';
 import { Knex } from 'knex';
 import pluralize from 'pluralize';
+import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
 import { KnexType } from '../knex';
+import { OverridesConfig } from '../types';
+import { getNestedResolver, queryMulti, querySingle } from './resolvers';
 import {
   generateQueryForEntity,
-  multiEntityQueryName,
-  singleEntityQueryName,
+  getDerivedFromDirective,
   getNonNullType,
-  getDerivedFromDirective
+  multiEntityQueryName,
+  singleEntityQueryName
 } from '../utils/graphql';
-import { OverridesConfig } from '../types';
-import { querySingle, queryMulti, getNestedResolver } from './resolvers';
-import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
-import { addResolversToSchema } from '@graphql-tools/schema';
 
 /**
  * Type for single and multiple query resolvers
@@ -136,14 +136,13 @@ export class GqlEntityController {
     const queryFields: GraphQLFieldConfigMap<any, any> = {};
 
     schemaObjects.forEach(type => {
-      queryFields[singleEntityQueryName(type)] = this.getSingleEntityQueryConfig(
-        type,
-        resolvers.singleEntityResolver
-      );
-      queryFields[multiEntityQueryName(type)] = this.getMultipleEntityQueryConfig(
-        type,
-        resolvers.multipleEntityResolver
-      );
+      queryFields[singleEntityQueryName(type)] =
+        this.getSingleEntityQueryConfig(type, resolvers.singleEntityResolver);
+      queryFields[multiEntityQueryName(type)] =
+        this.getMultipleEntityQueryConfig(
+          type,
+          resolvers.multipleEntityResolver
+        );
     });
 
     return queryFields;
@@ -160,23 +159,29 @@ export class GqlEntityController {
    */
   public generateEntityResolvers(fields: GraphQLFieldConfigMap<any, any>) {
     return this.schemaObjects.reduce((entities, obj) => {
-      entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
-        const nonNullType = getNonNullType(field.type);
+      entities[obj.name] = this.getTypeFields(obj).reduce(
+        (resolvers, field) => {
+          const nonNullType = getNonNullType(field.type);
 
-        if (isListType(nonNullType)) {
-          const itemType = getNonNullType(nonNullType.ofType);
+          if (isListType(nonNullType)) {
+            const itemType = getNonNullType(nonNullType.ofType);
 
-          if (itemType instanceof GraphQLObjectType) {
-            resolvers[field.name] = getNestedResolver(multiEntityQueryName(itemType));
+            if (itemType instanceof GraphQLObjectType) {
+              resolvers[field.name] = getNestedResolver(
+                multiEntityQueryName(itemType)
+              );
+            }
           }
-        }
 
-        if (nonNullType instanceof GraphQLObjectType) {
-          resolvers[field.name] = fields[singleEntityQueryName(nonNullType)].resolve;
-        }
+          if (nonNullType instanceof GraphQLObjectType) {
+            resolvers[field.name] =
+              fields[singleEntityQueryName(nonNullType)].resolve;
+          }
 
-        return resolvers;
-      }, {});
+          return resolvers;
+        },
+        {}
+      );
 
       return entities;
     }, {});
@@ -208,7 +213,9 @@ export class GqlEntityController {
    * ```
    *
    */
-  public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
+  public async createEntityStores(
+    knex: Knex
+  ): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
     if (knex.client.config.client === 'pg') {
@@ -222,35 +229,40 @@ export class GqlEntityController {
     this.schemaObjects.map(type => {
       const tableName = pluralize(type.name.toLowerCase());
 
-      builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        t.uuid('uid').primary().defaultTo(knex.fn.uuid());
-        t.specificType('block_range', 'int8range').notNullable();
+      builder = builder
+        .dropTableIfExists(tableName)
+        .createTable(tableName, t => {
+          t.uuid('uid').primary().defaultTo(knex.fn.uuid());
+          t.specificType('block_range', 'int8range').notNullable();
 
-        this.getTypeFields(type).forEach(field => {
-          const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-          if (
-            isListType(fieldType) &&
-            fieldType.ofType instanceof GraphQLObjectType &&
-            getDerivedFromDirective(field)
-          ) {
-            return;
-          }
-          const sqlType = this.getSqlType(field.type);
+          this.getTypeFields(type).forEach(field => {
+            const fieldType =
+              field.type instanceof GraphQLNonNull
+                ? field.type.ofType
+                : field.type;
+            if (
+              isListType(fieldType) &&
+              fieldType.ofType instanceof GraphQLObjectType &&
+              getDerivedFromDirective(field)
+            ) {
+              return;
+            }
+            const sqlType = this.getSqlType(field.type);
 
-          let column =
-            'options' in sqlType
-              ? t[sqlType.name](field.name, ...sqlType.options)
-              : t[sqlType.name](field.name);
+            let column =
+              'options' in sqlType
+                ? t[sqlType.name](field.name, ...sqlType.options)
+                : t[sqlType.name](field.name);
 
-          if (field.type instanceof GraphQLNonNull) {
-            column = column.notNullable();
-          }
+            if (field.type instanceof GraphQLNonNull) {
+              column = column.notNullable();
+            }
 
-          if (!['text', 'json'].includes(sqlType.name)) {
-            column.index();
-          }
+            if (!['text', 'json'].includes(sqlType.name)) {
+              column.index();
+            }
+          });
         });
-      });
 
       if (knex.client.config.client === 'pg') {
         builder = builder.raw(
@@ -301,11 +313,15 @@ export class GqlEntityController {
       return this._schemaObjects;
     }
 
-    this._schemaObjects = Object.values(this.schema.getTypeMap()).filter(type => {
-      return (
-        type instanceof GraphQLObjectType && type.name != 'Query' && !type.name.startsWith('__')
-      );
-    }) as GraphQLObjectType[];
+    this._schemaObjects = Object.values(this.schema.getTypeMap()).filter(
+      type => {
+        return (
+          type instanceof GraphQLObjectType &&
+          type.name != 'Query' &&
+          !type.name.startsWith('__')
+        );
+      }
+    ) as GraphQLObjectType[];
 
     return this._schemaObjects;
   }
@@ -345,7 +361,9 @@ export class GqlEntityController {
       nestedType: GraphQLObjectType<any, any>,
       prefix?: string
     ): WhereResult => {
-      const name = prefix ? `${prefix}_${nestedType.name}_filter` : `${nestedType.name}_filter`;
+      const name = prefix
+        ? `${prefix}_${nestedType.name}_filter`
+        : `${nestedType.name}_filter`;
 
       const orderByValues = {};
       const whereInputConfig: GraphQLInputObjectTypeConfig = {
@@ -387,13 +405,19 @@ export class GqlEntityController {
           }
 
           whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
-          whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_not`] = {
+            type: nonNullFieldType
+          };
 
           if (itemType === GraphQLString) {
             // those are the only supported operators for string arrays because PostgreSQL intersection
             // for jsonb is only supported for string arrays
-            whereInputConfig.fields[`${field.name}_contains`] = { type: nonNullFieldType };
-            whereInputConfig.fields[`${field.name}_not_contains`] = { type: nonNullFieldType };
+            whereInputConfig.fields[`${field.name}_contains`] = {
+              type: nonNullFieldType
+            };
+            whereInputConfig.fields[`${field.name}_not_contains`] = {
+              type: nonNullFieldType
+            };
           }
         }
 
@@ -410,28 +434,47 @@ export class GqlEntityController {
         }
 
         if (
-          (nonNullFieldType instanceof GraphQLScalarType && nonNullFieldType.name === 'BigInt') ||
+          (nonNullFieldType instanceof GraphQLScalarType &&
+            nonNullFieldType.name === 'BigInt') ||
           this.decimalTypes[nonNullFieldType.name]
         ) {
-          whereInputConfig.fields[`${field.name}_gt`] = { type: nonNullFieldType };
-          whereInputConfig.fields[`${field.name}_gte`] = { type: nonNullFieldType };
-          whereInputConfig.fields[`${field.name}_lt`] = { type: nonNullFieldType };
-          whereInputConfig.fields[`${field.name}_lte`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_gt`] = {
+            type: nonNullFieldType
+          };
+          whereInputConfig.fields[`${field.name}_gte`] = {
+            type: nonNullFieldType
+          };
+          whereInputConfig.fields[`${field.name}_lt`] = {
+            type: nonNullFieldType
+          };
+          whereInputConfig.fields[`${field.name}_lte`] = {
+            type: nonNullFieldType
+          };
         }
 
         if (
           nonNullFieldType === GraphQLString ||
           (nonNullFieldType as GraphQLScalarType).name === 'Text'
         ) {
-          whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
-          whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
-          whereInputConfig.fields[`${field.name}_contains_nocase`] = { type: GraphQLString };
-          whereInputConfig.fields[`${field.name}_not_contains_nocase`] = { type: GraphQLString };
+          whereInputConfig.fields[`${field.name}_contains`] = {
+            type: GraphQLString
+          };
+          whereInputConfig.fields[`${field.name}_not_contains`] = {
+            type: GraphQLString
+          };
+          whereInputConfig.fields[`${field.name}_contains_nocase`] = {
+            type: GraphQLString
+          };
+          whereInputConfig.fields[`${field.name}_not_contains_nocase`] = {
+            type: GraphQLString
+          };
         }
 
         if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
           whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
-          whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_not`] = {
+            type: nonNullFieldType
+          };
           whereInputConfig.fields[`${field.name}_in`] = {
             type: new GraphQLList(nonNullFieldType)
           };

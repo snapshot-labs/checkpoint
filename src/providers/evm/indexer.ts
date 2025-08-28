@@ -1,5 +1,5 @@
 import { Logger } from '../../utils/logger';
-import { Instance, BaseIndexer } from '../base';
+import { BaseIndexer, Instance } from '../base';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
@@ -11,8 +11,21 @@ export class EvmIndexer extends BaseIndexer {
     this.writers = writers;
   }
 
-  init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
-    this.provider = new EvmProvider({ instance, log, abis, writers: this.writers });
+  init({
+    instance,
+    log,
+    abis
+  }: {
+    instance: Instance;
+    log: Logger;
+    abis?: Record<string, any>;
+  }) {
+    this.provider = new EvmProvider({
+      instance,
+      log,
+      abis,
+      writers: this.writers
+    });
   }
 
   public getHandlers(): string[] {

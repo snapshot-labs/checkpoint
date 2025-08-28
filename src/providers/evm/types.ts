@@ -1,9 +1,13 @@
-import { Provider, Log } from '@ethersproject/providers';
 import { LogDescription } from '@ethersproject/abi';
+import { Log, Provider } from '@ethersproject/providers';
 import { BaseWriterParams } from '../../types';
 
 export class CustomJsonRpcError extends Error {
-  constructor(message: string, public code: number, public data: any) {
+  constructor(
+    message: string,
+    public code: number,
+    public data: any
+  ) {
     super(message);
   }
 }

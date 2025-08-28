@@ -13,8 +13,8 @@ import {
 } from 'graphql';
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
-import { getDerivedFromDirective } from './utils/graphql';
 import { OverridesConfig } from './types';
+import { getDerivedFromDirective } from './utils/graphql';
 
 type TypeInfo = {
   type: string;
@@ -74,7 +74,10 @@ export const getTypeInfo = (
     const nonNullNestedType =
       type.ofType instanceof GraphQLNonNull ? type.ofType.ofType : type.ofType;
 
-    return { type: `${getTypeInfo(nonNullNestedType, decimalTypes).type}[]`, initialValue: '[]' };
+    return {
+      type: `${getTypeInfo(nonNullNestedType, decimalTypes).type}[]`,
+      initialValue: '[]'
+    };
   }
 
   throw new Error('Unknown type');
@@ -104,7 +107,8 @@ export const getJSType = (
   field: GraphQLField<any, any>,
   decimalTypes: DecimalTypes = DEFAULT_DECIMAL_TYPES
 ) => {
-  const nonNullType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+  const nonNullType =
+    field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
   const isNullable = !(field.type instanceof GraphQLNonNull);
   const isList = nonNullType instanceof GraphQLList;
   const baseType = getBaseType(nonNullType, decimalTypes);
@@ -139,7 +143,9 @@ export const codegen = (
       idType.isNullable ||
       idType.isList
     ) {
-      throw new Error(`Model ${modelName} must have an id field of type string or number`);
+      throw new Error(
+        `Model ${modelName} must have an id field of type string or number`
+      );
     }
 
     contents +=
@@ -148,7 +154,8 @@ export const codegen = (
         : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
     contents += `    super(${modelName}.tableName, indexerName);\n\n`;
     typeFields.forEach(field => {
-      const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+      const fieldType =
+        field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (
         isListType(fieldType) &&
         fieldType.ofType instanceof GraphQLObjectType &&
@@ -158,7 +165,8 @@ export const codegen = (
       }
 
       const rawInitialValue = getInitialValue(field.type, decimalTypes);
-      const initialValue = field.name === 'id' ? 'id' : JSON.stringify(rawInitialValue);
+      const initialValue =
+        field.name === 'id' ? 'id' : JSON.stringify(rawInitialValue);
       contents += `    this.initialSet('${field.name}', ${initialValue});\n`;
     });
     contents += `  }\n\n`;
@@ -181,7 +189,8 @@ export const codegen = (
     contents += `  }\n\n`;
 
     typeFields.forEach(field => {
-      const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+      const fieldType =
+        field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (
         isListType(fieldType) &&
         fieldType.ofType instanceof GraphQLObjectType &&
@@ -198,7 +207,9 @@ export const codegen = (
           ? `  get ${field.name}() {\n`
           : `  get ${field.name}(): ${typeAnnotation} {\n`;
       contents += `    return ${
-        isList ? `JSON.parse(this.get('${field.name}'))` : `this.get('${field.name}')`
+        isList
+          ? `JSON.parse(this.get('${field.name}'))`
+          : `this.get('${field.name}')`
       };\n`;
       contents += `  }\n\n`;
 

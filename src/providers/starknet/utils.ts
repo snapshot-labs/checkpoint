@@ -1,10 +1,12 @@
-import { Abi, CallData, Event, ParsedEvent, events } from 'starknet';
+import { Abi, CallData, Event, events, ParsedEvent } from 'starknet';
 
 const convertEvent = (input: any) => {
   if (typeof input === 'bigint') return `0x${input.toString(16)}`;
   if (Array.isArray(input)) return input.map(convertEvent);
   if (typeof input === 'object')
-    return Object.fromEntries(Object.entries(input).map(([k, v]) => [k, convertEvent(v)]));
+    return Object.fromEntries(
+      Object.entries(input).map(([k, v]) => [k, convertEvent(v)])
+    );
 
   return input;
 };

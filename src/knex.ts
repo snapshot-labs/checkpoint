@@ -1,6 +1,6 @@
 import fs from 'fs';
-import knex, { Knex } from 'knex';
 import { ConnectionString } from 'connection-string';
+import knex, { Knex } from 'knex';
 
 export type KnexType =
   | {
@@ -26,16 +26,26 @@ const PROTOCOLS = {
 
 export function getConnectionData(connectionString: string) {
   const connectionConfig = new ConnectionString(connectionString);
-  if (!connectionConfig.protocol || !connectionConfig.hosts || !connectionConfig.path) {
+  if (
+    !connectionConfig.protocol ||
+    !connectionConfig.hosts ||
+    !connectionConfig.path
+  ) {
     throw new Error('invalid connection string provided');
   }
 
   const client = PROTOCOLS[connectionConfig.protocol];
   if (!client) {
-    throw new Error(`Supplied protocol ${connectionConfig.protocol} is not supported`);
+    throw new Error(
+      `Supplied protocol ${connectionConfig.protocol} is not supported`
+    );
   }
 
-  const sslConfig: { rejectUnauthorized?: boolean; sslmode?: string; ca?: string } = {};
+  const sslConfig: {
+    rejectUnauthorized?: boolean;
+    sslmode?: string;
+    ca?: string;
+  } = {};
   if (
     connectionConfig.params?.sslaccept === 'strict' ||
     connectionConfig.params?.ssl === 'rejectUnauthorized'
@@ -70,7 +80,8 @@ export function createKnexConfig(connectionString: string): Knex.Config {
 }
 
 export function createKnex(config: string | Knex.Config) {
-  const parsedConfig = typeof config === 'string' ? createKnexConfig(config) : config;
+  const parsedConfig =
+    typeof config === 'string' ? createKnexConfig(config) : config;
 
   return knex(parsedConfig);
 }
