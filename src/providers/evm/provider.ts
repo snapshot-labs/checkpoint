@@ -29,6 +29,7 @@ type GetLogsBlockRangeFilter = {
 
 /**
  * Timeout for client requests in milliseconds.
+ * This timeout is also used when fetching latest blocks in getLogs.
  */
 const CLIENT_TIMEOUT = 5 * 1000;
 
@@ -369,7 +370,10 @@ export class EvmProvider extends BaseProvider {
       topics?: (string | string[])[];
     } = {};
 
+    let signal: AbortSignal | undefined;
+
     if ('blockHash' in filter) {
+      signal = AbortSignal.timeout(CLIENT_TIMEOUT);
       params.blockHash = filter.blockHash;
     }
 
@@ -391,6 +395,7 @@ export class EvmProvider extends BaseProvider {
 
     const res = await fetch(this.instance.config.network_node_url, {
       method: 'POST',
+      signal,
       headers: {
         'Content-Type': 'application/json'
       },
