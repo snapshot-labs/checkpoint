@@ -1,6 +1,5 @@
 import { LogDescription } from '@ethersproject/abi';
-import { Log } from '@ethersproject/providers';
-import { GetBlockReturnType } from 'viem';
+import { GetBlockReturnType, Log } from 'viem';
 import { BaseWriterParams } from '../../types';
 
 export class CustomJsonRpcError extends Error {

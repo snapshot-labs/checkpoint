@@ -1,11 +1,13 @@
 import { Interface, LogDescription } from '@ethersproject/abi';
-import { Formatter, Log } from '@ethersproject/providers';
 import {
   createPublicClient,
+  formatLog,
   getAddress,
   http,
   keccak256,
+  Log,
   PublicClient,
+  RpcLog,
   stringToBytes
 } from 'viem';
 import { getRangeHint } from './helpers';
@@ -34,13 +36,9 @@ const MAX_BLOCKS_PER_REQUEST = 10000;
 export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
 
-  /**
-   * Formatter instance from ethers.js used to format raw responses.
-   */
-  private readonly formatter = new Formatter();
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
-  private logsCache = new Map<number, Log[]>();
+  private logsCache = new Map<bigint, Log[]>();
 
   constructor({
     instance,
@@ -91,7 +89,7 @@ export class EvmProvider extends BaseProvider {
 
     const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
     const hasPreloadedBlockEvents =
-      skipBlockFetching && this.logsCache.has(blockNumber);
+      skipBlockFetching && this.logsCache.has(BigInt(blockNumber));
 
     try {
       if (!hasPreloadedBlockEvents) {
@@ -111,7 +109,7 @@ export class EvmProvider extends BaseProvider {
 
     try {
       eventsData = await this.getEvents({
-        blockNumber,
+        blockNumber: BigInt(blockNumber),
         blockHash: block?.hash ?? null
       });
     } catch (err: unknown) {
@@ -195,7 +193,10 @@ export class EvmProvider extends BaseProvider {
       );
 
       for (const event of logs) {
-        const handler = globalEventHandlers[event.topics[0]];
+        const eventHash = event.topics[0];
+        if (!eventHash) continue;
+
+        const handler = globalEventHandlers[eventHash];
         if (!handler) continue;
 
         this.log.info(
@@ -309,7 +310,7 @@ export class EvmProvider extends BaseProvider {
     blockNumber
   }: {
     blockHash: string | null;
-    blockNumber: number;
+    blockNumber: bigint;
   }): Promise<EventsData> {
     let isPreloaded = false;
     let events: Log[] = [];
@@ -331,6 +332,8 @@ export class EvmProvider extends BaseProvider {
     return {
       isPreloaded,
       events: events.reduce((acc, event) => {
+        if (event.transactionHash === null) return acc;
+
         if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
 
         acc[event.transactionHash] = acc[event.transactionHash].concat(event);
@@ -408,9 +411,7 @@ export class EvmProvider extends BaseProvider {
       );
     }
 
-    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(
-      json.result
-    );
+    return json.result.map((log: RpcLog) => formatLog(log));
   }
 
   async getLogs(
@@ -502,6 +503,8 @@ export class EvmProvider extends BaseProvider {
     });
 
     for (const log of events) {
+      if (log.blockNumber === null) continue;
+
       if (!this.logsCache.has(log.blockNumber)) {
         this.logsCache.set(log.blockNumber, []);
       }
@@ -510,7 +513,7 @@ export class EvmProvider extends BaseProvider {
     }
 
     return events.map(log => ({
-      blockNumber: log.blockNumber,
+      blockNumber: Number(log.blockNumber),
       contractAddress: log.address
     }));
   }
