@@ -1,12 +1,12 @@
-import { parseEvent } from '../../../../src/providers/starknet/utils';
 import {
-  spaceFactoryAbi,
-  spaceAbi,
   factoryAbiCairo1,
+  spaceAbi,
   spaceDeployedEvent,
-  voteCreatedEvent,
-  spaceDeployedEventCairo1
+  spaceDeployedEventCairo1,
+  spaceFactoryAbi,
+  voteCreatedEvent
 } from './fixtures';
+import { parseEvent } from '../../../../src/providers/starknet/utils';
 
 describe('utils', () => {
   describe('parseEvent', () => {

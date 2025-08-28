@@ -1,6 +1,10 @@
-import knex from 'knex';
 import { mockDeep } from 'jest-mock-extended';
-import { CheckpointsStore, MetadataId, Table } from '../../../src/stores/checkpoints';
+import knex from 'knex';
+import {
+  CheckpointsStore,
+  MetadataId,
+  Table
+} from '../../../src/stores/checkpoints';
 import { Logger } from '../../../src/utils/logger';
 
 function createMockLogger() {
@@ -188,10 +192,16 @@ describe('CheckpointsStore', () => {
     });
 
     it('should return next checkpoint blocks', async () => {
-      let result = await store.getNextCheckpointBlocks(INDEXER, 4000, [CONTRACT_A, CONTRACT_B]);
+      let result = await store.getNextCheckpointBlocks(INDEXER, 4000, [
+        CONTRACT_A,
+        CONTRACT_B
+      ]);
       expect(result).toEqual([5000, 9000, 11000]);
 
-      result = await store.getNextCheckpointBlocks(INDEXER, 7000, [CONTRACT_A, CONTRACT_B]);
+      result = await store.getNextCheckpointBlocks(INDEXER, 7000, [
+        CONTRACT_A,
+        CONTRACT_B
+      ]);
       expect(result).toEqual([9000, 11000]);
 
       result = await store.getNextCheckpointBlocks(INDEXER, 4000, [CONTRACT_B]);

@@ -1,3 +1,4 @@
+import DataLoader from 'dataloader';
 import { graphqlHTTP } from 'express-graphql';
 import {
   GraphQLID,
@@ -7,9 +8,13 @@ import {
   GraphQLSchema,
   GraphQLString
 } from 'graphql';
-import DataLoader from 'dataloader';
 import { ResolverContextInput } from './resolvers';
-import { getTableName, applyQueryFilter, QueryFilter, applyDefaultOrder } from '../utils/database';
+import {
+  applyDefaultOrder,
+  applyQueryFilter,
+  getTableName,
+  QueryFilter
+} from '../utils/database';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -35,7 +40,10 @@ export const createGetLoader = (context: ResolverContextInput) => {
         query = applyQueryFilter(query, tableName, filter);
         query = applyDefaultOrder(query, tableName);
 
-        context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
+        context.log.debug(
+          { sql: query.toQuery(), ids },
+          'executing batched query'
+        );
 
         const results = await query;
 
@@ -85,7 +93,10 @@ export const MetadataGraphQLObject = new GraphQLObjectType({
   name: '_Metadata',
   description: 'Core metadata values used internally by Checkpoint',
   fields: {
-    id: { type: new GraphQLNonNull(GraphQLID), description: 'example: last_indexed_block' },
+    id: {
+      type: new GraphQLNonNull(GraphQLID),
+      description: 'example: last_indexed_block'
+    },
     indexer: { type: new GraphQLNonNull(GraphQLString) },
     value: { type: GraphQLString }
   }

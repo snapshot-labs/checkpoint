@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 
-import path from 'path';
 import fs from 'fs/promises';
+import path from 'path';
 import process from 'process';
-import yargs from 'yargs/yargs';
+import { printSchema } from 'graphql';
 import { hideBin } from 'yargs/helpers';
+import yargs from 'yargs/yargs';
 import { codegen } from '../codegen';
+import { GqlEntityController } from '../graphql/controller';
 import { OverridesConfig } from '../types';
 import { extendSchema } from '../utils/graphql';
-import { GqlEntityController } from '../graphql/controller';
-import { printSchema } from 'graphql';
 
 const DEFAULT_CONFIG_PATH = 'src/overrides.json';
 const DEFAULT_SCHEMA_PATH = 'src/schema.gql';
 const OUTPUT_DIRECTORY = '.checkpoint';
 
-async function generate(schemaFile: string, overridesConfigFile: string, format: string) {
+async function generate(
+  schemaFile: string,
+  overridesConfigFile: string,
+  format: string
+) {
   if (format !== 'typescript' && format !== 'javascript') {
     throw new Error('Invalid output format');
   }
@@ -29,7 +33,7 @@ async function generate(schemaFile: string, overridesConfigFile: string, format:
   let config: OverridesConfig = {};
   try {
     config = await import(overridesConfigFilePath);
-  } catch (err) {}
+  } catch {}
 
   let schema = await fs.readFile(schemaFilePath, 'utf8');
   schema = extendSchema(schema);
@@ -49,7 +53,10 @@ async function generate(schemaFile: string, overridesConfigFile: string, format:
   console.log('Generating query schema');
   const querySchema = controller.generateSchema();
   const schemaOutputPath = path.join(OUTPUT_DIRECTORY, 'schema.gql');
-  await fs.writeFile(path.join(cwd, schemaOutputPath), printSchema(querySchema));
+  await fs.writeFile(
+    path.join(cwd, schemaOutputPath),
+    printSchema(querySchema)
+  );
 
   console.log('Schema generated to', schemaOutputPath);
 }
@@ -81,7 +88,11 @@ yargs(hideBin(process.argv))
     },
     async argv => {
       try {
-        await generate(argv['schema-file'], argv['overrides-config-file'], argv['output-format']);
+        await generate(
+          argv['schema-file'],
+          argv['overrides-config-file'],
+          argv['output-format']
+        );
       } catch (err) {
         console.error('Error generating models:', err);
         process.exit(1);

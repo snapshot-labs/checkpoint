@@ -1,8 +1,8 @@
 import * as crypto from 'crypto';
 import { Knex } from 'knex';
-import { Logger } from '../utils/logger';
-import { chunk } from '../utils/helpers';
 import { TemplateSource } from '../types';
+import { chunk } from '../utils/helpers';
+import { Logger } from '../utils/logger';
 
 export const Table = {
   Blocks: '_blocks',
@@ -68,7 +68,11 @@ const CheckpointIdSize = 10;
  */
 export const getCheckpointId = (contract: string, block: number): string => {
   const data = `${contract}${block}`;
-  return crypto.createHash('sha256').update(data).digest('hex').slice(-CheckpointIdSize);
+  return crypto
+    .createHash('sha256')
+    .update(data)
+    .digest('hex')
+    .slice(-CheckpointIdSize);
 };
 
 /**
@@ -80,7 +84,10 @@ export const getCheckpointId = (contract: string, block: number): string => {
 export class CheckpointsStore {
   private readonly log: Logger;
 
-  constructor(private readonly knex: Knex, log: Logger) {
+  constructor(
+    private readonly knex: Knex,
+    log: Logger
+  ) {
     this.log = log.child({ component: 'checkpoints_store' });
   }
 
@@ -93,9 +100,13 @@ export class CheckpointsStore {
     this.log.debug('creating checkpoints tables...');
 
     const hasBlocksTable = await this.knex.schema.hasTable(Table.Blocks);
-    const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
+    const hasCheckpointsTable = await this.knex.schema.hasTable(
+      Table.Checkpoints
+    );
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
-    const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
+    const hasTemplateSourcesTable = await this.knex.schema.hasTable(
+      Table.TemplateSources
+    );
 
     let builder = this.knex.schema;
 
@@ -154,9 +165,13 @@ export class CheckpointsStore {
     this.log.debug('truncating checkpoints tables');
 
     const hasBlocksTable = await this.knex.schema.hasTable(Table.Blocks);
-    const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
+    const hasCheckpointsTable = await this.knex.schema.hasTable(
+      Table.Checkpoints
+    );
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
-    const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
+    const hasTemplateSourcesTable = await this.knex.schema.hasTable(
+      Table.TemplateSources
+    );
 
     if (hasBlocksTable) {
       await this.knex.schema.dropTable(Table.Blocks);
@@ -179,7 +194,10 @@ export class CheckpointsStore {
     await this.createStore();
   }
 
-  public async removeFutureData(indexer: string, blockNumber: number): Promise<void> {
+  public async removeFutureData(
+    indexer: string,
+    blockNumber: number
+  ): Promise<void> {
     return this.knex.transaction(async trx => {
       await trx
         .table(Table.Metadata)
@@ -197,11 +215,18 @@ export class CheckpointsStore {
         .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
         .del();
 
-      await trx.table(Table.Blocks).where(Fields.Blocks.Number, '>', blockNumber).del();
+      await trx
+        .table(Table.Blocks)
+        .where(Fields.Blocks.Number, '>', blockNumber)
+        .del();
     });
   }
 
-  public async setBlockHash(indexer: string, blockNumber: number, hash: string): Promise<void> {
+  public async setBlockHash(
+    indexer: string,
+    blockNumber: number,
+    hash: string
+  ): Promise<void> {
     await this.knex.table(Table.Blocks).insert({
       [Fields.Blocks.Indexer]: indexer,
       [Fields.Blocks.Number]: blockNumber,
@@ -209,7 +234,10 @@ export class CheckpointsStore {
     });
   }
 
-  public async getBlockHash(indexer: string, blockNumber: number): Promise<string | null> {
+  public async getBlockHash(
+    indexer: string,
+    blockNumber: number
+  ): Promise<string | null> {
     const blocks = await this.knex
       .select(Fields.Blocks.Hash)
       .from(Table.Blocks)
@@ -228,7 +256,11 @@ export class CheckpointsStore {
     return this.knex(Table.Blocks).where(Fields.Blocks.Indexer, indexer).del();
   }
 
-  public async setMetadata(indexer: string, id: string, value: ToString): Promise<void> {
+  public async setMetadata(
+    indexer: string,
+    id: string,
+    value: ToString
+  ): Promise<void> {
     await this.knex
       .table(Table.Metadata)
       .insert({
@@ -240,7 +272,10 @@ export class CheckpointsStore {
       .merge();
   }
 
-  public async getMetadata(indexer: string, id: string): Promise<string | null> {
+  public async getMetadata(
+    indexer: string,
+    id: string
+  ): Promise<string | null> {
     const value = await this.knex
       .select(Fields.Metadata.Value)
       .from(Table.Metadata)
@@ -255,21 +290,31 @@ export class CheckpointsStore {
     return value[0][Fields.Metadata.Value];
   }
 
-  public async getMetadataNumber(indexer: string, id: string, base = 10): Promise<number | null> {
+  public async getMetadataNumber(
+    indexer: string,
+    id: string,
+    base = 10
+  ): Promise<number | null> {
     const strValue = await this.getMetadata(indexer, id);
     if (strValue === null) return null;
 
     return parseInt(strValue, base);
   }
 
-  public async insertCheckpoints(indexer: string, checkpoints: CheckpointRecord[]): Promise<void> {
+  public async insertCheckpoints(
+    indexer: string,
+    checkpoints: CheckpointRecord[]
+  ): Promise<void> {
     const insert = async (items: CheckpointRecord[]) => {
       try {
         await this.knex
           .table(Table.Checkpoints)
           .insert(
             items.map(checkpoint => {
-              const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
+              const id = getCheckpointId(
+                checkpoint.contractAddress,
+                checkpoint.blockNumber
+              );
 
               return {
                 [Fields.Checkpoints.Id]: id,

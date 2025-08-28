@@ -1,6 +1,10 @@
 import { CheckpointRecord } from '../stores/checkpoints';
+import {
+  CheckpointConfig,
+  CheckpointOptions,
+  ContractSourceConfig
+} from '../types';
 import { Logger } from '../utils/logger';
-import { CheckpointConfig, CheckpointOptions, ContractSourceConfig } from '../types';
 
 export type Instance = {
   config: CheckpointConfig;
@@ -75,7 +79,9 @@ export class BaseProvider {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   processBlock(blockNum: number, parentHash: string | null): Promise<number> {
-    throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
+    throw new Error(
+      `processBlock method was not defined when fetching block ${blockNum}`
+    );
   }
 
   processPool(blockNumber: number): Promise<void> {
@@ -84,7 +90,10 @@ export class BaseProvider {
     );
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+  async getCheckpointsRange(
+    fromBlock: number,
+    toBlock: number
+  ): Promise<CheckpointRecord[]> {
     throw new Error(
       `getCheckpointsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
     );
@@ -94,8 +103,17 @@ export class BaseProvider {
 export class BaseIndexer {
   protected provider?: BaseProvider;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
+  init({
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    instance,
+    log,
+    abis
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+  }: {
+    instance: Instance;
+    log: Logger;
+    abis?: Record<string, any>;
+  }) {
     throw new Error('init method was not defined');
   }
 

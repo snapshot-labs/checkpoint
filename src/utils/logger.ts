@@ -1,4 +1,4 @@
-import pino, { Logger as PinoLogger, LoggerOptions } from 'pino';
+import pino, { LoggerOptions, Logger as PinoLogger } from 'pino';
 
 /** The minimum level to log. */
 export enum LogLevel {

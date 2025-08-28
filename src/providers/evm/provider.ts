@@ -1,14 +1,19 @@
-import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
-import { getAddress } from '@ethersproject/address';
-import { Formatter, Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, LogDescription } from '@ethersproject/abi';
+import { getAddress } from '@ethersproject/address';
 import { keccak256 } from '@ethersproject/keccak256';
+import {
+  Formatter,
+  Log,
+  Provider,
+  StaticJsonRpcProvider
+} from '@ethersproject/providers';
 import { toUtf8Bytes } from '@ethersproject/strings';
+import { getRangeHint } from './helpers';
+import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, Writer, EventsData, CustomJsonRpcError } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
-import { getRangeHint } from './helpers';
+import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 
 type GetLogsBlockHashFilter = {
   blockHash: string;
@@ -36,10 +41,14 @@ export class EvmProvider extends BaseProvider {
     log,
     abis,
     writers
-  }: ConstructorParameters<typeof BaseProvider>[0] & { writers: Record<string, Writer> }) {
+  }: ConstructorParameters<typeof BaseProvider>[0] & {
+    writers: Record<string, Writer>;
+  }) {
     super({ instance, log, abis });
 
-    this.provider = new StaticJsonRpcProvider(this.instance.config.network_node_url);
+    this.provider = new StaticJsonRpcProvider(
+      this.instance.config.network_node_url
+    );
     this.writers = writers;
   }
 
@@ -66,14 +75,18 @@ export class EvmProvider extends BaseProvider {
     let eventsData: EventsData;
 
     const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
-    const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
+    const hasPreloadedBlockEvents =
+      skipBlockFetching && this.logsCache.has(blockNum);
 
     try {
       if (!hasPreloadedBlockEvents) {
         block = await this.provider.getBlock(blockNum);
       }
     } catch (e) {
-      this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
+      this.log.error(
+        { blockNumber: blockNum, err: e },
+        'getting block failed... retrying'
+      );
       throw e;
     }
 
@@ -93,7 +106,10 @@ export class EvmProvider extends BaseProvider {
         throw new BlockNotFoundError();
       }
 
-      this.log.error({ blockNumber: blockNum, err: e }, 'getting events failed... retrying');
+      this.log.error(
+        { blockNumber: blockNum, err: e },
+        'getting events failed... retrying'
+      );
       throw e;
     }
 
@@ -113,7 +129,11 @@ export class EvmProvider extends BaseProvider {
     return blockNum + 1;
   }
 
-  private async handleBlock(blockNumber: number, block: Block | null, eventsData: EventsData) {
+  private async handleBlock(
+    blockNumber: number,
+    block: Block | null,
+    eventsData: EventsData
+  ) {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsData.events);
@@ -152,20 +172,27 @@ export class EvmProvider extends BaseProvider {
     }
 
     if (this.instance.config.global_events) {
-      const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
-        handlers[this.getEventHash(event.name)] = {
-          name: event.name,
-          fn: event.fn
-        };
-        return handlers;
-      }, {});
+      const globalEventHandlers = this.instance.config.global_events.reduce(
+        (handlers, event) => {
+          handlers[this.getEventHash(event.name)] = {
+            name: event.name,
+            fn: event.fn
+          };
+          return handlers;
+        },
+        {}
+      );
 
       for (const event of logs) {
         const handler = globalEventHandlers[event.topics[0]];
         if (!handler) continue;
 
         this.log.info(
-          { contract: event.address, event: handler.name, handlerFn: handler.fn },
+          {
+            contract: event.address,
+            event: handler.name,
+            handlerFn: handler.fn
+          },
           'found contract event'
         );
 
@@ -193,7 +220,11 @@ export class EvmProvider extends BaseProvider {
             if (targetTopic === log.topics[0]) {
               foundContractData = true;
               this.log.info(
-                { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
+                {
+                  contract: source.contract,
+                  event: sourceEvent.name,
+                  handlerFn: sourceEvent.fn
+                },
                 'found contract event'
               );
 
@@ -204,7 +235,12 @@ export class EvmProvider extends BaseProvider {
                   parsedEvent = iface.parseLog(log);
                 } catch (err) {
                   this.log.warn(
-                    { contract: source.contract, txId, handlerFn: sourceEvent.fn },
+                    {
+                      err,
+                      contract: source.contract,
+                      txId,
+                      handlerFn: sourceEvent.fn
+                    },
                     'failed to parse event'
                   );
                 }
@@ -354,10 +390,16 @@ export class EvmProvider extends BaseProvider {
     const json = await res.json();
 
     if (json.error) {
-      throw new CustomJsonRpcError(json.error.message, json.error.code, json.error.data);
+      throw new CustomJsonRpcError(
+        json.error.message,
+        json.error.code,
+        json.error.data
+      );
     }
 
-    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(json.result);
+    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(
+      json.result
+    );
   }
 
   async getLogs(
@@ -429,14 +471,19 @@ export class EvmProvider extends BaseProvider {
         source.events.map(event => this.getEventHash(event.name))
       );
 
-      const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [topics]);
+      const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [
+        topics
+      ]);
       events = events.concat(chunkEvents);
     }
 
     return events;
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+  async getCheckpointsRange(
+    fromBlock: number,
+    toBlock: number
+  ): Promise<CheckpointRecord[]> {
     const events = await this.getLogsForSources({
       fromBlock,
       toBlock,

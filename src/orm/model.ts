@@ -17,7 +17,9 @@ export default class Model {
     const currentBlock = register.getCurrentBlock(this.indexerName);
 
     const diff = Object.fromEntries(
-      [...this.values.entries()].filter(([key]) => this.valuesImplicitlySet.has(key))
+      [...this.values.entries()].filter(([key]) =>
+        this.valuesImplicitlySet.has(key)
+      )
     );
 
     return knex.transaction(async trx => {
@@ -27,7 +29,9 @@ export default class Model {
         .andWhere('_indexer', this.indexerName)
         .andWhereRaw('upper_inf(block_range)')
         .update({
-          block_range: knex.raw('int8range(lower(block_range), ?)', [currentBlock])
+          block_range: knex.raw('int8range(lower(block_range), ?)', [
+            currentBlock
+          ])
         });
 
       const newEntity = {
@@ -55,7 +59,9 @@ export default class Model {
       .insert({
         ...entity,
         _indexer: this.indexerName,
-        block_range: register.getKnex().raw('int8range(?, NULL)', [currentBlock])
+        block_range: register
+          .getKnex()
+          .raw('int8range(?, NULL)', [currentBlock])
       });
   }
 
@@ -69,7 +75,9 @@ export default class Model {
       .andWhere('_indexer', this.indexerName)
       .andWhereRaw('upper_inf(block_range)')
       .update({
-        block_range: register.getKnex().raw('int8range(lower(block_range), ?)', [currentBlock])
+        block_range: register
+          .getKnex()
+          .raw('int8range(lower(block_range), ?)', [currentBlock])
       });
   }
 

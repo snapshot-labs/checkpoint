@@ -1,13 +1,13 @@
 import {
-  GraphQLObjectType,
+  GraphQLField,
   GraphQLNonNull,
+  GraphQLObjectType,
+  GraphQLScalarType,
   isLeafType,
   isListType,
-  GraphQLScalarType,
-  GraphQLField,
   parse,
-  visit,
-  print
+  print,
+  visit
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
@@ -26,7 +26,10 @@ export const extendSchema = (schema: string): string => {
             name: { kind: 'Name', value: 'field' },
             type: {
               kind: 'NonNullType',
-              type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } }
+              type: {
+                kind: 'NamedType',
+                name: { kind: 'Name', value: 'String' }
+              }
             }
           }
         ],
@@ -62,7 +65,8 @@ export const extendSchema = (schema: string): string => {
  * Returns name of query for fetching single entity record
  *
  */
-export const singleEntityQueryName = (entity: GraphQLObjectType) => entity.name.toLowerCase();
+export const singleEntityQueryName = (entity: GraphQLObjectType) =>
+  entity.name.toLowerCase();
 
 /**
  * Returns name of query for fetching multiple entity records
@@ -80,12 +84,18 @@ export const multiEntityQueryName = (entity: GraphQLObjectType) => {
  */
 export const generateQueryForEntity = (entity: GraphQLObjectType): string => {
   // function to recursively build fields map
-  const getObjectFields = (object: GraphQLObjectType, queryFields = {}): Record<string, any> => {
+  const getObjectFields = (
+    object: GraphQLObjectType,
+    queryFields = {}
+  ): Record<string, any> => {
     const objectFields = object.getFields();
 
     Object.keys(objectFields).forEach(fieldName => {
       const rawFieldType = objectFields[fieldName].type;
-      const fieldType = rawFieldType instanceof GraphQLNonNull ? rawFieldType.ofType : rawFieldType;
+      const fieldType =
+        rawFieldType instanceof GraphQLNonNull
+          ? rawFieldType.ofType
+          : rawFieldType;
 
       if (isLeafType(fieldType)) {
         queryFields[fieldName] = true;

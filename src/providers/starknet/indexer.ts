@@ -1,6 +1,6 @@
-import { Logger } from '../../utils/logger';
-import { Instance, BaseIndexer } from '../base';
 import { StarknetProvider } from '.';
+import { Logger } from '../../utils/logger';
+import { BaseIndexer, Instance } from '../base';
 import { Writer } from './types';
 
 export class StarknetIndexer extends BaseIndexer {
@@ -11,8 +11,21 @@ export class StarknetIndexer extends BaseIndexer {
     this.writers = writers;
   }
 
-  init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
-    this.provider = new StarknetProvider({ instance, log, abis, writers: this.writers });
+  init({
+    instance,
+    log,
+    abis
+  }: {
+    instance: Instance;
+    log: Logger;
+    abis?: Record<string, any>;
+  }) {
+    this.provider = new StarknetProvider({
+      instance,
+      log,
+      abis,
+      writers: this.writers
+    });
   }
 
   public getHandlers(): string[] {

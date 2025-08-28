@@ -1,3 +1,4 @@
+import DataLoader from 'dataloader';
 import {
   GraphQLField,
   GraphQLList,
@@ -15,10 +16,14 @@ import {
 } from 'graphql-parse-resolve-info';
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
-import { getNonNullType, getDerivedFromDirective } from '../utils/graphql';
-import { getTableName, applyQueryFilter, QueryFilter, applyDefaultOrder } from '../utils/database';
+import {
+  applyDefaultOrder,
+  applyQueryFilter,
+  getTableName,
+  QueryFilter
+} from '../utils/database';
+import { getDerivedFromDirective, getNonNullType } from '../utils/graphql';
 import { Logger } from '../utils/logger';
-import type DataLoader from 'dataloader';
 
 type BaseArgs = {
   block?: number;
@@ -82,7 +87,11 @@ export async function queryMulti(
     indexer: args.indexer
   });
 
-  const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
+  const handleWhere = (
+    query: Knex.QueryBuilder,
+    prefix: string,
+    where: Record<string, any>
+  ) => {
     const isFieldList = (fieldName: string) => {
       const fieldType = getNonNullType(returnType.getFields()[fieldName].type);
       return isListType(fieldType);
@@ -97,10 +106,13 @@ export async function queryMulti(
         const isList = isFieldList(fieldName);
 
         if (isList) {
-          query = query.whereRaw(`NOT :field: @> :value::jsonb OR NOT :field: <@ :value::jsonb`, {
-            field: `${prefix}.${fieldName}`,
-            value: JSON.stringify(w[1])
-          });
+          query = query.whereRaw(
+            `NOT :field: @> :value::jsonb OR NOT :field: <@ :value::jsonb`,
+            {
+              field: `${prefix}.${fieldName}`,
+              value: JSON.stringify(w[1])
+            }
+          );
         } else {
           query = query.where(`${prefix}.${fieldName}`, '!=', w[1]);
         }
@@ -126,7 +138,10 @@ export async function queryMulti(
           query = query.not.whereLike(`${prefix}.${fieldName}`, `%${w[1]}%`);
         }
       } else if (w[0].endsWith('_not_contains_nocase')) {
-        query = query.not.whereILike(`${prefix}.${w[0].slice(0, -20)}`, `%${w[1]}%`);
+        query = query.not.whereILike(
+          `${prefix}.${w[0].slice(0, -20)}`,
+          `%${w[1]}%`
+        );
       } else if (w[0].endsWith('_contains')) {
         const fieldName = w[0].slice(0, -9);
         const isList = isFieldList(fieldName);
@@ -141,7 +156,10 @@ export async function queryMulti(
           query = query.whereLike(`${prefix}.${fieldName}`, `%${w[1]}%`);
         }
       } else if (w[0].endsWith('_contains_nocase')) {
-        query = query.whereILike(`${prefix}.${w[0].slice(0, -16)}`, `%${w[1]}%`);
+        query = query.whereILike(
+          `${prefix}.${w[0].slice(0, -16)}`,
+          `%${w[1]}%`
+        );
       } else if (w[0].endsWith('_not_in')) {
         query = query.not.whereIn(`${prefix}.${w[0].slice(0, -7)}`, w[1]);
       } else if (w[0].endsWith('_in')) {
@@ -151,7 +169,9 @@ export async function queryMulti(
         const nestedReturnType = getNonNullType(
           returnType.getFields()[fieldName].type as GraphQLObjectType
         );
-        const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
+        const nestedTableName = getTableName(
+          nestedReturnType.name.toLowerCase()
+        );
 
         const fields = Object.values(nestedReturnType.getFields())
           .filter(field => {
@@ -168,14 +188,25 @@ export async function queryMulti(
         nestedEntitiesMappings[fieldName] = {
           [`${fieldName}.id`]: `${nestedTableName}.id`,
           ...Object.fromEntries(
-            fields.map(field => [`${fieldName}.${field}`, `${nestedTableName}.${field}`])
+            fields.map(field => [
+              `${fieldName}.${field}`,
+              `${nestedTableName}.${field}`
+            ])
           )
         };
 
         query = query
           .columns(nestedEntitiesMappings[fieldName])
-          .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`)
-          .whereRaw('?? = ??', [`${tableName}._indexer`, `${nestedTableName}._indexer`]);
+          .innerJoin(
+            nestedTableName,
+            `${tableName}.${fieldName}`,
+            '=',
+            `${nestedTableName}.id`
+          )
+          .whereRaw('?? = ??', [
+            `${tableName}._indexer`,
+            `${nestedTableName}._indexer`
+          ]);
 
         query = applyQueryFilter(query, nestedTableName, {
           block: args.block,
@@ -188,10 +219,13 @@ export async function queryMulti(
         const isList = isFieldList(fieldName);
 
         if (isList) {
-          query = query.whereRaw(`:field: @> :value::jsonb AND :field: <@ :value::jsonb`, {
-            field: `${prefix}.${fieldName}`,
-            value: JSON.stringify(w[1])
-          });
+          query = query.whereRaw(
+            `:field: @> :value::jsonb AND :field: <@ :value::jsonb`,
+            {
+              field: `${prefix}.${fieldName}`,
+              value: JSON.stringify(w[1])
+            }
+          );
         } else {
           query = query.where(`${prefix}.${fieldName}`, w[1]);
         }
@@ -271,16 +305,24 @@ export async function querySingle(
 
   const parsed = parseResolveInfo(info);
   if (parsed && parentResolvedValue) {
-    // @ts-ignore
-    const simplified = simplifyParsedResolveInfoFragmentWithType(parsed, returnType);
+    const simplified = simplifyParsedResolveInfoFragmentWithType(
+      // @ts-ignore
+      parsed,
+      returnType
+    );
 
-    if (Object.keys(simplified.fields).length === 1 && simplified.fields['id']) {
+    if (
+      Object.keys(simplified.fields).length === 1 &&
+      simplified.fields['id']
+    ) {
       return { id: parentResolvedValue, _args: queryFilter };
     }
   }
 
   const id = parentResolvedValue || args.id;
-  const items = await context.getLoader(returnType.name.toLowerCase(), 'id', queryFilter).load(id);
+  const items = await context
+    .getLoader(returnType.name.toLowerCase(), 'id', queryFilter)
+    .load(id);
   if (items.length === 0) {
     throw new Error(`Row not found: ${id}`);
   }
@@ -309,34 +351,48 @@ export const getNestedResolver =
     const returnType = getNonNullType(info.returnType) as
       | GraphQLList<GraphQLObjectType>
       | GraphQLList<GraphQLNonNull<GraphQLObjectType>>;
-    const jsonFields = getJsonFields(getNonNullType(returnType.ofType) as GraphQLObjectType);
+    const jsonFields = getJsonFields(
+      getNonNullType(returnType.ofType) as GraphQLObjectType
+    );
 
     const parentType = getNonNullType(info.parentType) as GraphQLObjectType;
     const field = parentType.getFields()[info.fieldName];
 
     const fieldType =
-      info.returnType instanceof GraphQLNonNull ? info.returnType.ofType : info.returnType;
+      info.returnType instanceof GraphQLNonNull
+        ? info.returnType.ofType
+        : info.returnType;
     if (!isListType(fieldType)) return [];
 
     const derivedFromDirective = getDerivedFromDirective(field);
 
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
-      const loaderResult = await getLoader(columnName, 'id', queryFilter).loadMany(
-        parent[info.fieldName]
-      );
+      const loaderResult = await getLoader(
+        columnName,
+        'id',
+        queryFilter
+      ).loadMany(parent[info.fieldName]);
 
       // NOTE: loader returns array of arrays when used with loadMany, because in some cases,
       // for example when fetching derived entities we expect multiple results for a single id
       // this is why we need to flatten it. In the future it would be nice to have clearer API
       result = loaderResult.flat();
     } else {
-      const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
+      const fieldArgument = derivedFromDirective.arguments?.find(
+        arg => arg.name.value === 'field'
+      );
       if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
-        throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
+        throw new Error(
+          `field ${field.name} is missing field in derivedFrom directive`
+        );
       }
 
-      result = await getLoader(columnName, fieldArgument.value.value, queryFilter).load(parent.id);
+      result = await getLoader(
+        columnName,
+        fieldArgument.value.value,
+        queryFilter
+      ).load(parent.id);
     }
 
     return result.map(item => ({
@@ -353,7 +409,10 @@ function getJsonFields(type: GraphQLObjectType) {
   });
 }
 
-function formatItem(item: Record<string, any>, jsonFields: GraphQLField<any, any>[]) {
+function formatItem(
+  item: Record<string, any>,
+  jsonFields: GraphQLField<any, any>[]
+) {
   const formatted = { ...item };
 
   jsonFields.forEach(field => {

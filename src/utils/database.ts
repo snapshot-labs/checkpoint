@@ -1,5 +1,5 @@
-import pluralize from 'pluralize';
 import { Knex } from 'knex';
+import pluralize from 'pluralize';
 import { INTERNAL_TABLES } from '../stores/checkpoints';
 
 export type QueryFilter = {
@@ -25,14 +25,19 @@ export function applyQueryFilter(
   if (!isInternalTable) {
     filteredQuery =
       filters.block !== undefined
-        ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [filters.block])
+        ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [
+            filters.block
+          ])
         : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
   }
 
   if (filters.indexer !== undefined) {
     const columnName = isInternalTable ? 'indexer' : `_indexer`;
 
-    filteredQuery = query.andWhere(`${tableName}.${columnName}`, filters.indexer);
+    filteredQuery = query.andWhere(
+      `${tableName}.${columnName}`,
+      filters.indexer
+    );
   }
 
   return filteredQuery;

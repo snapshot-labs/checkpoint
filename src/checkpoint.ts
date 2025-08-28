@@ -1,17 +1,17 @@
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
+import { Container } from './container';
 import getGraphQL from './graphql';
 import { GqlEntityController } from './graphql/controller';
-import { CheckpointsStore } from './stores/checkpoints';
-import { BaseIndexer } from './providers';
-import { createLogger, Logger, LogLevel } from './utils/logger';
-import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { createPgPool } from './pg';
-import { checkpointConfigSchema } from './schemas';
+import { BaseIndexer } from './providers';
 import { register } from './register';
+import { checkpointConfigSchema } from './schemas';
+import { CheckpointsStore } from './stores/checkpoints';
 import { CheckpointConfig, CheckpointOptions } from './types';
-import { Container } from './container';
+import { extendSchema } from './utils/graphql';
+import { createLogger, Logger, LogLevel } from './utils/logger';
 
 export default class Checkpoint {
   private readonly entityController: GqlEntityController;
@@ -28,7 +28,10 @@ export default class Checkpoint {
 
   constructor(schema: string, opts?: CheckpointOptions) {
     this.schema = extendSchema(schema);
-    this.entityController = new GqlEntityController(this.schema, opts?.overridesConfig);
+    this.entityController = new GqlEntityController(
+      this.schema,
+      opts?.overridesConfig
+    );
 
     this.opts = opts;
     this.log = createLogger({
@@ -57,10 +60,16 @@ export default class Checkpoint {
     register.setKnex(this.knex);
   }
 
-  public addIndexer(name: string, config: CheckpointConfig, indexer: BaseIndexer) {
+  public addIndexer(
+    name: string,
+    config: CheckpointConfig,
+    indexer: BaseIndexer
+  ) {
     const validationResult = checkpointConfigSchema.safeParse(config);
     if (validationResult.success === false) {
-      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
+      throw new Error(
+        `Checkpoint config is invalid: ${validationResult.error.message}`
+      );
     }
 
     const container = new Container(
@@ -100,7 +109,11 @@ export default class Checkpoint {
   public get graphql() {
     const schema = this.getSchema();
 
-    return getGraphQL(schema, this.getBaseContext(), this.entityController.generateSampleQuery());
+    return getGraphQL(
+      schema,
+      this.getBaseContext(),
+      this.entityController.generateSampleQuery()
+    );
   }
 
   /**
@@ -113,7 +126,9 @@ export default class Checkpoint {
   public async start() {
     this.log.debug('starting');
 
-    await Promise.all([...this.containers.values()].map(container => container.start()));
+    await Promise.all(
+      [...this.containers.values()].map(container => container.start())
+    );
   }
 
   /**

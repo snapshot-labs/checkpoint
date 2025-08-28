@@ -1,5 +1,11 @@
-import { GraphQLObjectType, buildSchema } from 'graphql';
-import { getInitialValue, getBaseType, getJSType, codegen, getTypeInfo } from '../../src/codegen';
+import { buildSchema, GraphQLObjectType } from 'graphql';
+import {
+  codegen,
+  getBaseType,
+  getInitialValue,
+  getJSType,
+  getTypeInfo
+} from '../../src/codegen';
 import { GqlEntityController } from '../../src/graphql/controller';
 import { extendSchema } from '../../src/utils/graphql';
 
@@ -103,7 +109,9 @@ describe('getInitialValue', () => {
 
   it('should return stringified empty array for List types', () => {
     expect(getInitialValue(spaceFields['strategies'].type)).toEqual('[]');
-    expect(getInitialValue(spaceFields['strategies_nonnull'].type)).toEqual('[]');
+    expect(getInitialValue(spaceFields['strategies_nonnull'].type)).toEqual(
+      '[]'
+    );
   });
 
   it('should return empty string for object types', () => {
@@ -145,7 +153,9 @@ describe('getBaseType', () => {
 
   it('should return array type for List types', () => {
     expect(getBaseType(spaceFields['strategies'].type)).toBe('string[]');
-    expect(getBaseType(spaceFields['strategies_nonnull'].type)).toBe('string[]');
+    expect(getBaseType(spaceFields['strategies_nonnull'].type)).toBe(
+      'string[]'
+    );
   });
 
   it('should return string for BigDecimal types', () => {
@@ -177,10 +187,14 @@ describe('codegen', () => {
   const controller = new GqlEntityController(extendedSchema);
 
   it('should generate typescript code', () => {
-    expect(codegen(controller, overridesConfig, 'typescript')).toMatchSnapshot();
+    expect(
+      codegen(controller, overridesConfig, 'typescript')
+    ).toMatchSnapshot();
   });
 
   it('should generate javascript code', () => {
-    expect(codegen(controller, overridesConfig, 'javascript')).toMatchSnapshot();
+    expect(
+      codegen(controller, overridesConfig, 'javascript')
+    ).toMatchSnapshot();
   });
 });

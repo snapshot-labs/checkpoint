@@ -1,11 +1,17 @@
 import objectHash from 'object-hash';
-import { CheckpointConfig, ContractSourceConfig, ContractTemplate } from '../types';
+import {
+  CheckpointConfig,
+  ContractSourceConfig,
+  ContractTemplate
+} from '../types';
 
 export const getContractsFromConfig = (config: CheckpointConfig): string[] => {
   return (config.sources || []).map(source => source.contract);
 };
 
-const getHashableProperties = (config: ContractTemplate | ContractSourceConfig) => ({
+const getHashableProperties = (
+  config: ContractTemplate | ContractSourceConfig
+) => ({
   contract: 'contract' in config ? config.contract : undefined,
   start: 'start' in config ? config.start : undefined,
   events: (config.events || []).map(event => event.name)
@@ -20,7 +26,10 @@ export const getConfigChecksum = (config: CheckpointConfig): string => {
       global_events,
       sources: (sources || []).map(source => getHashableProperties(source)),
       templates: Object.fromEntries(
-        Object.entries(templates || {}).map(([key, value]) => [key, getHashableProperties(value)])
+        Object.entries(templates || {}).map(([key, value]) => [
+          key,
+          getHashableProperties(value)
+        ])
       )
     },
     {
