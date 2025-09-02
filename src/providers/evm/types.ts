@@ -1,5 +1,10 @@
-import { LogDescription } from '@ethersproject/abi';
-import { Log, Provider } from '@ethersproject/providers';
+import {
+  Abi,
+  ContractEventName,
+  GetBlockReturnType,
+  Log,
+  ParseEventLogsReturnType
+} from 'viem';
 import { BaseWriterParams } from '../../types';
 
 export class CustomJsonRpcError extends Error {
@@ -22,13 +27,16 @@ export type EventsData = {
   events: Record<string, Log[]>;
 };
 
-export type Block = Awaited<ReturnType<Provider['getBlock']>>;
+export type Block = GetBlockReturnType;
 
-export type Writer = (
+export type Writer<
+  WriterAbi extends Abi = any,
+  EventName extends ContractEventName<WriterAbi> = any
+> = (
   args: {
     txId: string;
     block: Block | null;
     rawEvent?: Log;
-    event?: LogDescription;
+    event?: ParseEventLogsReturnType<WriterAbi, EventName, true>[number];
   } & BaseWriterParams
 ) => Promise<void>;
