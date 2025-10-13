@@ -514,7 +514,7 @@ export class EvmProvider extends BaseProvider {
     const events = await this.getLogsForSources({
       fromBlock,
       toBlock,
-      sources: this.instance.getCurrentSources(fromBlock)
+      sources: this.instance.getCurrentSources(toBlock)
     });
 
     for (const log of events) {
