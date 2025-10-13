@@ -493,7 +493,7 @@ export class StarknetProvider extends BaseProvider {
     const events = await this.getEventsForSources({
       fromBlock,
       toBlock,
-      sources: this.instance.getCurrentSources(fromBlock)
+      sources: this.instance.getCurrentSources(toBlock)
     });
 
     for (const log of events) {
