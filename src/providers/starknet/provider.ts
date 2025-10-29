@@ -1,4 +1,4 @@
-import { BlockWithTxReceipts, SPEC } from '@starknet-io/types-js';
+import { BLOCK_ID, BlockWithTxReceipts } from '@starknet-io/types-js';
 import { hash, RpcProvider, validateAndParseAddress } from 'starknet';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import {
@@ -118,7 +118,7 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async processPool(blockNumber: number) {
-    const block = await this.getBlockWithReceipts('pending');
+    const block = await this.getBlockWithReceipts('pre_confirmed');
     const receipts = block.transactions
       .map(({ receipt }) => receipt)
       .filter(
@@ -349,7 +349,7 @@ export class StarknetProvider extends BaseProvider {
     this.log.debug({ txId }, 'handling transaction done');
   }
 
-  private async getBlockWithReceipts(blockId: SPEC.BLOCK_ID) {
+  private async getBlockWithReceipts(blockId: BLOCK_ID) {
     const res = await fetch(this.instance.config.network_node_url, {
       method: 'POST',
       headers: {
