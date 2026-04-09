@@ -9,14 +9,12 @@ export function createPreloader(
   config: CheckpointConfig,
   log: Logger
 ): Preloader | undefined {
-  if (config.hypersync_api_token) {
-    log.info('using HyperSync preloader');
+  if (!config.hypersync_api_token) return;
 
-    return new HypersyncPreloader({
-      apiToken: config.hypersync_api_token,
-      rpcUrl: config.network_node_url
-    });
-  }
+  log.info('using HyperSync preloader');
 
-  return undefined;
+  return new HypersyncPreloader({
+    apiToken: config.hypersync_api_token,
+    rpcUrl: config.network_node_url
+  });
 }

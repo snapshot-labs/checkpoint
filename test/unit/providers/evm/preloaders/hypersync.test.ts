@@ -1,4 +1,4 @@
-import { HypersyncPreloader } from '../../../../../src/providers/evm/fetchers/hypersync';
+import { HypersyncPreloader } from '../../../../../src/providers/evm/preloaders/hypersync';
 
 describe('HypersyncPreloader', () => {
   it('should be instantiated with apiToken and rpcUrl', () => {

@@ -7,7 +7,7 @@ import {
 } from 'viem';
 import { BaseWriterParams } from '../../types';
 
-export { FetchedBlock, Preloader } from './fetchers/types';
+export { FetchedBlock, Preloader } from './preloaders/types';
 
 export class CustomJsonRpcError extends Error {
   constructor(

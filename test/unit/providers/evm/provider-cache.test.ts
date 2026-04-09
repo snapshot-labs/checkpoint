@@ -1,5 +1,5 @@
 import { EvmProvider } from '../../../../src/providers/evm/provider';
-import { FetchedBlock } from '../../../../src/providers/evm/fetchers/types';
+import { FetchedBlock } from '../../../../src/providers/evm/preloaders/types';
 
 describe('EvmProvider block cache', () => {
   it('should store and retrieve cached blocks', () => {

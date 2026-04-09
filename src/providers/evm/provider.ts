@@ -12,7 +12,7 @@ import {
   stringToBytes
 } from 'viem';
 import { getRangeHint } from './helpers';
-import { FetchedBlock, Preloader } from './fetchers/types';
+import { FetchedBlock, Preloader } from './preloaders/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';

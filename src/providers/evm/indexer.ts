@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
-import { createPreloader } from './fetchers';
+import { createPreloader } from './preloaders';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
