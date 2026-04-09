@@ -1,4 +1,4 @@
-import { type Log } from 'viem';
+import { Log } from 'viem';
 import { CheckpointRecord } from '../../../stores/checkpoints';
 import { ContractSourceConfig } from '../../../types';
 import { BlockFetcher, FetchedBlock } from './types';
@@ -54,23 +54,29 @@ const FIELD_SELECTION = {
 };
 
 export class HypersyncBlockFetcher implements BlockFetcher {
-  private readonly url: string;
+  private url: string | null = null;
   private readonly apiToken: string;
   private readonly rpcFetcher: RpcBlockFetcher;
   private readonly blockCache = new Map<number, FetchedBlock>();
 
   constructor({
-    chainId,
     apiToken,
     rpcUrl
   }: {
-    chainId: number;
     apiToken: string;
     rpcUrl: string;
   }) {
-    this.url = `https://${chainId}.hypersync.xyz`;
     this.apiToken = apiToken;
     this.rpcFetcher = new RpcBlockFetcher(rpcUrl);
+  }
+
+  private async getUrl(): Promise<string> {
+    if (!this.url) {
+      const chainId = await this.rpcFetcher.getChainId();
+      this.url = `https://${chainId}.hypersync.xyz`;
+    }
+
+    return this.url;
   }
 
   getCachedBlocks(): Map<number, FetchedBlock> {
@@ -82,7 +88,8 @@ export class HypersyncBlockFetcher implements BlockFetcher {
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    const res = await fetch(`${this.url}/height`);
+    const url = await this.getUrl();
+    const res = await fetch(`${url}/height`);
     if (!res.ok) {
       throw new Error(`HyperSync height request failed: ${res.statusText}`);
     }
@@ -175,7 +182,8 @@ export class HypersyncBlockFetcher implements BlockFetcher {
   }
 
   private async query(body: Record<string, unknown>): Promise<HypersyncResponse> {
-    const res = await fetch(`${this.url}/query`, {
+    const url = await this.getUrl();
+    const res = await fetch(`${url}/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

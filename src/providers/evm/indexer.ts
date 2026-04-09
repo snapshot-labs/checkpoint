@@ -12,8 +12,16 @@ export class EvmIndexer extends BaseIndexer {
     this.writers = writers;
   }
 
-  async init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
-    const fetcher = await createBlockFetcher(instance.config, log);
+  init({
+    instance,
+    log,
+    abis
+  }: {
+    instance: Instance;
+    log: Logger;
+    abis?: Record<string, any>;
+  }) {
+    const fetcher = createBlockFetcher(instance.config, log);
 
     this.provider = new EvmProvider({
       instance,
