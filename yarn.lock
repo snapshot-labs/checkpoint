@@ -499,6 +499,42 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
+"@envio-dev/hypersync-client-darwin-arm64@1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client-darwin-arm64/-/hypersync-client-darwin-arm64-1.3.0.tgz#570864a069d9d0aab5e0f079c9312f4760430287"
+  integrity sha512-JZwiVRbMSuJnKsVUpfjTHc3YgAMvGlyuqWQxVc7Eok4Xp/sZLUCXRQUykbCh6fOUWRmoa2JG/ykP/NotoTRCBg==
+
+"@envio-dev/hypersync-client-darwin-x64@1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client-darwin-x64/-/hypersync-client-darwin-x64-1.3.0.tgz#b2ff4c0f051462526380752a790ad594355cec24"
+  integrity sha512-2eSzQqqqFBMK2enVucYGcny5Ep4DEKYxf3Xme7z9qp2d3c6fMcbVvM4Gt8KOzb7ySjwJ2gU+qY2h545T2NiJXQ==
+
+"@envio-dev/hypersync-client-linux-arm64-gnu@1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client-linux-arm64-gnu/-/hypersync-client-linux-arm64-gnu-1.3.0.tgz#6faae143bceb44693490ac51234164b67a97f75b"
+  integrity sha512-gsjMp3WKekwnA89HvJXvcTM3BE5wVFG/qTF4rmk3rGiXhZ+MGaZQKrYRAhnzQZblueFtF/xnnBYpO35Z3ZFThg==
+
+"@envio-dev/hypersync-client-linux-x64-gnu@1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client-linux-x64-gnu/-/hypersync-client-linux-x64-gnu-1.3.0.tgz#ed44ccaa118a5cb5a1f59a62812fb63e2c3324d1"
+  integrity sha512-Lkvi4lRVwCyFOXf9LYH2X91zmW2l1vbfojKhTwKgqFWv6PMN5atlYjt+/NcUCAAhk5EUavWGjoikwnvLp870cg==
+
+"@envio-dev/hypersync-client-linux-x64-musl@1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client-linux-x64-musl/-/hypersync-client-linux-x64-musl-1.3.0.tgz#b7c59244376956d64c7cdb2978315ae3d0c1b84e"
+  integrity sha512-UIjB/gUX2sl23EMXLBxqtkgMnOjNSiaHK+CSU5vXMXkzL3fOGbz24bvyaPsSv82cxCFEE0yTwlSKkCX6/L8o6Q==
+
+"@envio-dev/hypersync-client@^1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@envio-dev/hypersync-client/-/hypersync-client-1.3.0.tgz#dd0f5dbf38144dcceb78b3d89760156ef7caf509"
+  integrity sha512-wUdfZzbsFPbGq6n/1mmUMsWuiAil+m+fL/GBX5LGUyMJV86TXy2SBtAqYYNyDxWLO6gvGr6PYKrP8pLVAUZDZg==
+  optionalDependencies:
+    "@envio-dev/hypersync-client-darwin-arm64" "1.3.0"
+    "@envio-dev/hypersync-client-darwin-x64" "1.3.0"
+    "@envio-dev/hypersync-client-linux-arm64-gnu" "1.3.0"
+    "@envio-dev/hypersync-client-linux-x64-gnu" "1.3.0"
+    "@envio-dev/hypersync-client-linux-x64-musl" "1.3.0"
+
 "@eslint-community/eslint-utils@^4.2.0", "@eslint-community/eslint-utils@^4.7.0":
   version "4.7.0"
   resolved "https://registry.yarnpkg.com/@eslint-community/eslint-utils/-/eslint-utils-4.7.0.tgz#607084630c6c033992a082de6e6fbc1a8b52175a"
