@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
-import { createFetchers } from './fetchers';
+import { createPreloader } from './fetchers';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
@@ -21,15 +21,12 @@ export class EvmIndexer extends BaseIndexer {
     log: Logger;
     abis?: Record<string, any>;
   }) {
-    const { fetcher, preloader } = createFetchers(instance.config, log);
-
     this.provider = new EvmProvider({
       instance,
       log,
       abis,
       writers: this.writers,
-      fetcher,
-      preloader
+      preloader: createPreloader(instance.config, log)
     });
   }
 
