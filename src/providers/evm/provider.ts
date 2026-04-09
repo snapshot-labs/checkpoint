@@ -6,7 +6,7 @@ import {
   ParseEventLogsReturnType,
   stringToBytes
 } from 'viem';
-import { BlockFetcher } from './fetchers/types';
+import { BlockFetcher, FetchedBlock } from './fetchers/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
@@ -18,7 +18,7 @@ export class EvmProvider extends BaseProvider {
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
   private logsCache = new Map<bigint, Log[]>();
-  blockTimestampCache = new Map<number, number>();
+  private blockCache = new Map<number, FetchedBlock>();
 
   constructor({
     instance,
@@ -64,15 +64,24 @@ export class EvmProvider extends BaseProvider {
 
     try {
       if (!hasPreloadedBlockEvents) {
-        const fetched = await this.fetcher.getBlock(blockNumber);
-        const cachedTimestamp = this.blockTimestampCache.get(blockNumber);
-        const timestamp = cachedTimestamp ?? fetched.timestamp;
-        block = {
-          number: BigInt(blockNumber),
-          hash: fetched.hash,
-          parentHash: fetched.parentHash,
-          timestamp: BigInt(timestamp)
-        } as Block;
+        const cached = this.blockCache.get(blockNumber);
+        if (cached) {
+          this.blockCache.delete(blockNumber);
+          block = {
+            number: BigInt(cached.number),
+            hash: cached.hash,
+            parentHash: cached.parentHash,
+            timestamp: BigInt(cached.timestamp)
+          } as Block;
+        } else {
+          const fetched = await this.fetcher.getBlock(blockNumber);
+          block = {
+            number: BigInt(fetched.number),
+            hash: fetched.hash,
+            parentHash: fetched.parentHash,
+            timestamp: BigInt(fetched.timestamp)
+          } as Block;
+        }
       }
     } catch (err) {
       this.log.error({ blockNumber, err }, 'getting block failed... retrying');
@@ -376,11 +385,12 @@ export class EvmProvider extends BaseProvider {
       this.logsCache.get(log.blockNumber)?.push(log);
     }
 
-    const blockTimestamps = this.fetcher.getBlockTimestamps?.();
-    if (blockTimestamps) {
-      for (const [blockNumber, timestamp] of blockTimestamps) {
-        this.blockTimestampCache.set(blockNumber, timestamp);
+    const cachedBlocks = this.fetcher.getCachedBlocks?.();
+    if (cachedBlocks) {
+      for (const [blockNumber, fetchedBlock] of cachedBlocks) {
+        this.blockCache.set(blockNumber, fetchedBlock);
       }
+      cachedBlocks.clear();
     }
 
     return checkpoints;
@@ -392,10 +402,6 @@ export class EvmProvider extends BaseProvider {
     }
 
     return this.sourceHashes.get(eventName) as string;
-  }
-
-  cacheBlockTimestamp(blockNumber: number, timestamp: number): void {
-    this.blockTimestampCache.set(blockNumber, timestamp);
   }
 
   compareAddress(a: string, b: string) {

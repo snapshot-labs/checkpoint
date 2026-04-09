@@ -27,5 +27,5 @@ export type BlockFetcher = {
     sources: ContractSourceConfig[],
     getEventHash: (name: string) => string
   ): Promise<{ checkpoints: CheckpointRecord[]; logs: Log[] }>;
-  getBlockTimestamps?(): Map<number, number>;
+  getCachedBlocks?(): Map<number, FetchedBlock>;
 };

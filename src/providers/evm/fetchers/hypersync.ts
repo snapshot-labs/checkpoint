@@ -12,7 +12,7 @@ import { RpcBlockFetcher } from './rpc';
 export class HypersyncBlockFetcher implements BlockFetcher {
   private readonly hypersync: HypersyncClient;
   private readonly rpcFetcher: RpcBlockFetcher;
-  private readonly blockTimestamps = new Map<number, number>();
+  private readonly blockCache = new Map<number, FetchedBlock>();
 
   constructor({
     chainId,
@@ -30,8 +30,8 @@ export class HypersyncBlockFetcher implements BlockFetcher {
     this.rpcFetcher = new RpcBlockFetcher(rpcUrl);
   }
 
-  getBlockTimestamps(): Map<number, number> {
-    return this.blockTimestamps;
+  getCachedBlocks(): Map<number, FetchedBlock> {
+    return this.blockCache;
   }
 
   async getChainId(): Promise<number> {
@@ -92,15 +92,25 @@ export class HypersyncBlockFetcher implements BlockFetcher {
           'Topic3',
           'Removed'
         ],
-        block: ['Number', 'Timestamp']
+        block: ['Number', 'Timestamp', 'Hash', 'ParentHash']
       }
     };
 
     const response = await this.hypersync.collect(query, {});
 
     for (const block of response.data.blocks) {
-      if (block.number != null && block.timestamp != null) {
-        this.blockTimestamps.set(block.number, block.timestamp);
+      if (
+        block.number != null &&
+        block.timestamp != null &&
+        block.hash != null &&
+        block.parentHash != null
+      ) {
+        this.blockCache.set(block.number, {
+          number: block.number,
+          hash: block.hash,
+          parentHash: block.parentHash,
+          timestamp: block.timestamp
+        });
       }
     }
 
