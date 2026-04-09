@@ -1,11 +1,11 @@
-import { HypersyncBlockFetcher } from '../../../../../src/providers/evm/fetchers/hypersync';
+import { HypersyncPreloader } from '../../../../../src/providers/evm/fetchers/hypersync';
 
-describe('HypersyncBlockFetcher', () => {
+describe('HypersyncPreloader', () => {
   it('should be instantiated with apiToken and rpcUrl', () => {
-    const fetcher = new HypersyncBlockFetcher({
+    const preloader = new HypersyncPreloader({
       apiToken: 'test-token',
       rpcUrl: 'https://rpc.example.com'
     });
-    expect(fetcher).toBeDefined();
+    expect(preloader).toBeDefined();
   });
 });

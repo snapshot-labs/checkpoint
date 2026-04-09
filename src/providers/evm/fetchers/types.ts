@@ -27,5 +27,17 @@ export type BlockFetcher = {
     sources: ContractSourceConfig[],
     getEventHash: (name: string) => string
   ): Promise<{ checkpoints: CheckpointRecord[]; logs: Log[] }>;
-  getCachedBlocks?(): Map<number, FetchedBlock>;
+};
+
+export type Preloader = {
+  getCheckpointsRange(
+    fromBlock: number,
+    toBlock: number,
+    sources: ContractSourceConfig[],
+    getEventHash: (name: string) => string
+  ): Promise<{
+    checkpoints: CheckpointRecord[];
+    logs: Log[];
+    blocks: FetchedBlock[];
+  }>;
 };

@@ -1,25 +1,27 @@
 import { CheckpointConfig } from '../../../types';
 import { Logger } from '../../../utils/logger';
-import { BlockFetcher, FetchedBlock } from './types';
+import { BlockFetcher, FetchedBlock, Preloader } from './types';
 import { RpcBlockFetcher } from './rpc';
-import { HypersyncBlockFetcher } from './hypersync';
+import { HypersyncPreloader } from './hypersync';
 
-export { BlockFetcher, FetchedBlock, RpcBlockFetcher, HypersyncBlockFetcher };
+export { BlockFetcher, FetchedBlock, Preloader, RpcBlockFetcher, HypersyncPreloader };
 
-export function createBlockFetcher(
+export function createFetchers(
   config: CheckpointConfig,
   log: Logger
-): BlockFetcher {
-  if (config.hypersync_api_token) {
-    log.info('using HyperSync block fetcher');
+): { fetcher: BlockFetcher; preloader?: Preloader } {
+  const fetcher = new RpcBlockFetcher(config.network_node_url);
 
-    return new HypersyncBlockFetcher({
+  if (config.hypersync_api_token) {
+    log.info('using HyperSync preloader');
+
+    const preloader = new HypersyncPreloader({
       apiToken: config.hypersync_api_token,
       rpcUrl: config.network_node_url
     });
+
+    return { fetcher, preloader };
   }
 
-  log.info('using RPC block fetcher');
-
-  return new RpcBlockFetcher(config.network_node_url);
+  return { fetcher };
 }

@@ -6,7 +6,7 @@ import {
   ParseEventLogsReturnType,
   stringToBytes
 } from 'viem';
-import { BlockFetcher, FetchedBlock } from './fetchers/types';
+import { BlockFetcher, FetchedBlock, Preloader } from './fetchers/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
@@ -14,6 +14,7 @@ import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 
 export class EvmProvider extends BaseProvider {
   private readonly fetcher: BlockFetcher;
+  private readonly preloader?: Preloader;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
@@ -25,14 +26,17 @@ export class EvmProvider extends BaseProvider {
     log,
     abis,
     writers,
-    fetcher
+    fetcher,
+    preloader
   }: ConstructorParameters<typeof BaseProvider>[0] & {
     writers: Record<string, Writer>;
     fetcher: BlockFetcher;
+    preloader?: Preloader;
   }) {
     super({ instance, log, abis });
 
     this.fetcher = fetcher;
+    this.preloader = preloader;
     this.writers = writers;
   }
 
@@ -368,12 +372,35 @@ export class EvmProvider extends BaseProvider {
     fromBlock: number,
     toBlock: number
   ): Promise<CheckpointRecord[]> {
-    const { checkpoints, logs } = await this.fetcher.getCheckpointsRange(
-      fromBlock,
-      toBlock,
-      this.instance.getCurrentSources(toBlock),
-      name => this.getEventHash(name)
-    );
+    const sources = this.instance.getCurrentSources(toBlock);
+    const getEventHash = (name: string) => this.getEventHash(name);
+
+    let checkpoints: CheckpointRecord[];
+    let logs: Log[];
+
+    if (this.preloader) {
+      const result = await this.preloader.getCheckpointsRange(
+        fromBlock,
+        toBlock,
+        sources,
+        getEventHash
+      );
+      checkpoints = result.checkpoints;
+      logs = result.logs;
+
+      for (const block of result.blocks) {
+        this.blockCache.set(block.number, block);
+      }
+    } else {
+      const result = await this.fetcher.getCheckpointsRange(
+        fromBlock,
+        toBlock,
+        sources,
+        getEventHash
+      );
+      checkpoints = result.checkpoints;
+      logs = result.logs;
+    }
 
     for (const log of logs) {
       if (log.blockNumber === null) continue;
@@ -383,14 +410,6 @@ export class EvmProvider extends BaseProvider {
       }
 
       this.logsCache.get(log.blockNumber)?.push(log);
-    }
-
-    const cachedBlocks = this.fetcher.getCachedBlocks?.();
-    if (cachedBlocks) {
-      for (const [blockNumber, fetchedBlock] of cachedBlocks) {
-        this.blockCache.set(blockNumber, fetchedBlock);
-      }
-      cachedBlocks.clear();
     }
 
     return checkpoints;
