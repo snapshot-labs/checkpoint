@@ -13,6 +13,7 @@ import {
 } from 'viem';
 import { getRangeHint } from './helpers';
 import { FetchedBlock, Preloader } from './fetchers/types';
+import { RpcPreloader } from './fetchers/rpc';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
@@ -38,7 +39,7 @@ const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
-  private readonly preloader?: Preloader;
+  private readonly preloader: Preloader;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
@@ -63,7 +64,7 @@ export class EvmProvider extends BaseProvider {
       })
     });
 
-    this.preloader = preloader;
+    this.preloader = preloader ?? new RpcPreloader(this.getLogs.bind(this));
     this.writers = writers;
   }
 
@@ -529,35 +530,16 @@ export class EvmProvider extends BaseProvider {
     toBlock: number
   ): Promise<CheckpointRecord[]> {
     const sources = this.instance.getCurrentSources(toBlock);
-
-    let checkpoints: CheckpointRecord[];
-    let logs: Log[];
-
-    if (this.preloader) {
-      const result = await this.preloader.getCheckpointsRange(
+    const { checkpoints, logs, blocks } =
+      await this.preloader.getCheckpointsRange(
         fromBlock,
         toBlock,
         sources,
         name => this.getEventHash(name)
       );
-      checkpoints = result.checkpoints;
-      logs = result.logs;
 
-      for (const block of result.blocks) {
-        this.blockCache.set(block.number, block);
-      }
-    } else {
-      const events = await this.getLogsForSources({
-        fromBlock,
-        toBlock,
-        sources
-      });
-
-      checkpoints = events.map(log => ({
-        blockNumber: Number(log.blockNumber),
-        contractAddress: log.address
-      }));
-      logs = events;
+    for (const block of blocks) {
+      this.blockCache.set(block.number, block);
     }
 
     for (const log of logs) {

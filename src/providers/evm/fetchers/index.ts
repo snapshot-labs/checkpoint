@@ -1,22 +1,5 @@
-import { CheckpointConfig } from '../../../types';
-import { Logger } from '../../../utils/logger';
 import { FetchedBlock, Preloader } from './types';
+import { RpcPreloader } from './rpc';
 import { HypersyncPreloader } from './hypersync';
 
-export { FetchedBlock, Preloader, HypersyncPreloader };
-
-export function createPreloader(
-  config: CheckpointConfig,
-  log: Logger
-): Preloader | undefined {
-  if (config.hypersync_api_token) {
-    log.info('using HyperSync preloader');
-
-    return new HypersyncPreloader({
-      apiToken: config.hypersync_api_token,
-      rpcUrl: config.network_node_url
-    });
-  }
-
-  return undefined;
-}
+export { FetchedBlock, Preloader, RpcPreloader, HypersyncPreloader };
