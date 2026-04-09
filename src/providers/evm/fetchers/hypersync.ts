@@ -1,16 +1,61 @@
-import {
-  HypersyncClient,
-  type Query,
-  type Log as HypersyncLog
-} from '@envio-dev/hypersync-client';
 import { type Log } from 'viem';
 import { CheckpointRecord } from '../../../stores/checkpoints';
 import { ContractSourceConfig } from '../../../types';
 import { BlockFetcher, FetchedBlock } from './types';
 import { RpcBlockFetcher } from './rpc';
 
+type HypersyncLog = {
+  block_number?: number;
+  log_index?: number;
+  transaction_index?: number;
+  transaction_hash?: string;
+  block_hash?: string;
+  address?: string;
+  data?: string;
+  topic0?: string | null;
+  topic1?: string | null;
+  topic2?: string | null;
+  topic3?: string | null;
+  removed?: boolean;
+};
+
+type HypersyncBlock = {
+  number?: number;
+  timestamp?: number;
+  hash?: string;
+  parent_hash?: string;
+};
+
+type HypersyncResponse = {
+  next_block: number;
+  archive_height?: number;
+  data: {
+    blocks: HypersyncBlock[];
+    logs: HypersyncLog[];
+  };
+};
+
+const FIELD_SELECTION = {
+  block: ['number', 'timestamp', 'hash', 'parent_hash'],
+  log: [
+    'block_number',
+    'log_index',
+    'transaction_index',
+    'transaction_hash',
+    'block_hash',
+    'address',
+    'data',
+    'topic0',
+    'topic1',
+    'topic2',
+    'topic3',
+    'removed'
+  ]
+};
+
 export class HypersyncBlockFetcher implements BlockFetcher {
-  private readonly hypersync: HypersyncClient;
+  private readonly url: string;
+  private readonly apiToken: string;
   private readonly rpcFetcher: RpcBlockFetcher;
   private readonly blockCache = new Map<number, FetchedBlock>();
 
@@ -23,10 +68,8 @@ export class HypersyncBlockFetcher implements BlockFetcher {
     apiToken: string;
     rpcUrl: string;
   }) {
-    this.hypersync = new HypersyncClient({
-      url: `https://${chainId}.hypersync.xyz`,
-      apiToken
-    });
+    this.url = `https://${chainId}.hypersync.xyz`;
+    this.apiToken = apiToken;
     this.rpcFetcher = new RpcBlockFetcher(rpcUrl);
   }
 
@@ -39,7 +82,14 @@ export class HypersyncBlockFetcher implements BlockFetcher {
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    return this.hypersync.getHeight();
+    const res = await fetch(`${this.url}/height`);
+    if (!res.ok) {
+      throw new Error(`HyperSync height request failed: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    return data.height;
   }
 
   async getBlock(blockNumber: number): Promise<FetchedBlock> {
@@ -68,53 +118,31 @@ export class HypersyncBlockFetcher implements BlockFetcher {
           : [topics[0]]
         : undefined;
 
-    const query: Query = {
-      fromBlock,
-      toBlock: toBlock + 1, // HyperSync toBlock is exclusive
-      logs: [
-        {
-          address: addresses,
-          topics: topic0 ? [topic0] : undefined
-        }
-      ],
-      fieldSelection: {
-        log: [
-          'BlockNumber',
-          'TransactionHash',
-          'TransactionIndex',
-          'BlockHash',
-          'Address',
-          'Data',
-          'LogIndex',
-          'Topic0',
-          'Topic1',
-          'Topic2',
-          'Topic3',
-          'Removed'
+    let allLogs: HypersyncLog[] = [];
+    let currentFrom = fromBlock;
+    const exclusiveToBlock = toBlock + 1;
+
+    while (currentFrom < exclusiveToBlock) {
+      const response = await this.query({
+        from_block: currentFrom,
+        to_block: exclusiveToBlock,
+        logs: [
+          {
+            address: addresses,
+            topics: topic0 ? [topic0] : undefined
+          }
         ],
-        block: ['Number', 'Timestamp', 'Hash', 'ParentHash']
-      }
-    };
+        field_selection: FIELD_SELECTION
+      });
 
-    const response = await this.hypersync.collect(query, {});
+      this.cacheBlocks(response.data.blocks);
+      allLogs = allLogs.concat(response.data.logs);
 
-    for (const block of response.data.blocks) {
-      if (
-        block.number != null &&
-        block.timestamp != null &&
-        block.hash != null &&
-        block.parentHash != null
-      ) {
-        this.blockCache.set(block.number, {
-          number: block.number,
-          hash: block.hash,
-          parentHash: block.parentHash,
-          timestamp: block.timestamp
-        });
-      }
+      if (response.next_block >= exclusiveToBlock) break;
+      currentFrom = response.next_block;
     }
 
-    return this.convertHypersyncLogs(response.data.logs);
+    return this.convertLogs(allLogs);
   }
 
   async getCheckpointsRange(
@@ -146,21 +174,57 @@ export class HypersyncBlockFetcher implements BlockFetcher {
     return { checkpoints, logs: allLogs };
   }
 
-  private convertHypersyncLogs(hypersyncLogs: HypersyncLog[]): Log[] {
+  private async query(body: Record<string, unknown>): Promise<HypersyncResponse> {
+    const res = await fetch(`${this.url}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiToken}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      throw new Error(`HyperSync query failed: ${res.statusText}`);
+    }
+
+    return res.json();
+  }
+
+  private cacheBlocks(blocks: HypersyncBlock[]): void {
+    for (const block of blocks) {
+      if (
+        block.number != null &&
+        block.timestamp != null &&
+        block.hash != null &&
+        block.parent_hash != null
+      ) {
+        this.blockCache.set(block.number, {
+          number: block.number,
+          hash: block.hash,
+          parentHash: block.parent_hash,
+          timestamp: block.timestamp
+        });
+      }
+    }
+  }
+
+  private convertLogs(hypersyncLogs: HypersyncLog[]): Log[] {
     return hypersyncLogs.map(log => {
       const topics: `0x${string}`[] = [];
-      for (const topic of log.topics) {
-        if (topic) topics.push(topic as `0x${string}`);
-      }
+      if (log.topic0) topics.push(log.topic0 as `0x${string}`);
+      if (log.topic1) topics.push(log.topic1 as `0x${string}`);
+      if (log.topic2) topics.push(log.topic2 as `0x${string}`);
+      if (log.topic3) topics.push(log.topic3 as `0x${string}`);
 
       return {
-        address: log.address as `0x${string}`,
-        blockHash: log.blockHash as `0x${string}`,
-        blockNumber: log.blockNumber != null ? BigInt(log.blockNumber) : null,
+        address: (log.address ?? '0x') as `0x${string}`,
+        blockHash: (log.block_hash ?? null) as `0x${string}` | null,
+        blockNumber: log.block_number != null ? BigInt(log.block_number) : null,
         data: (log.data ?? '0x') as `0x${string}`,
-        logIndex: log.logIndex ?? 0,
-        transactionHash: log.transactionHash as `0x${string}`,
-        transactionIndex: log.transactionIndex ?? 0,
+        logIndex: log.log_index ?? 0,
+        transactionHash: (log.transaction_hash ?? null) as `0x${string}` | null,
+        transactionIndex: log.transaction_index ?? 0,
         removed: log.removed ?? false,
         topics
       } as Log;
