@@ -76,12 +76,6 @@ export class Container implements Instance {
     this.indexer = indexer;
     this.schema = schema;
     this.opts = opts;
-
-    this.indexer.init({
-      instance: this,
-      log: this.log,
-      abis: config.abis
-    });
   }
 
   public get sourceContracts() {
@@ -209,6 +203,12 @@ export class Container implements Instance {
    *
    */
   public async start() {
+    await this.indexer.init({
+      instance: this,
+      log: this.log,
+      abis: this.config.abis
+    });
+
     await this.validateStore();
 
     const templateSources = await this.store.getTemplateSources(

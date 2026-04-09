@@ -11,7 +11,7 @@ export class StarknetIndexer extends BaseIndexer {
     this.writers = writers;
   }
 
-  init({
+  async init({
     instance,
     log,
     abis

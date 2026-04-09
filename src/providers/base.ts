@@ -103,7 +103,7 @@ export class BaseProvider {
 export class BaseIndexer {
   protected provider?: BaseProvider;
 
-  init({
+  async init({
     /* eslint-disable @typescript-eslint/no-unused-vars */
     instance,
     log,
@@ -113,7 +113,7 @@ export class BaseIndexer {
     instance: Instance;
     log: Logger;
     abis?: Record<string, any>;
-  }) {
+  }): Promise<void> {
     throw new Error('init method was not defined');
   }
 

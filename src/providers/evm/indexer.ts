@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
-import { RpcBlockFetcher } from './fetchers/rpc';
+import { createBlockFetcher } from './fetchers';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
@@ -12,16 +12,8 @@ export class EvmIndexer extends BaseIndexer {
     this.writers = writers;
   }
 
-  init({
-    instance,
-    log,
-    abis
-  }: {
-    instance: Instance;
-    log: Logger;
-    abis?: Record<string, any>;
-  }) {
-    const fetcher = new RpcBlockFetcher(instance.config.network_node_url);
+  async init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
+    const fetcher = await createBlockFetcher(instance.config, log);
 
     this.provider = new EvmProvider({
       instance,
