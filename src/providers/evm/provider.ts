@@ -12,11 +12,12 @@ import {
   stringToBytes
 } from 'viem';
 import { getRangeHint } from './helpers';
+import { createPreloader } from './preloaders';
 import { FetchedBlock, Preloader } from './preloaders/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
-import { sleep } from '../../utils/helpers';
+import { chunk, sleep } from '../../utils/helpers';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 
 type GetLogsBlockHashFilter = {
@@ -38,7 +39,8 @@ const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
-  private readonly preloader?: Preloader;
+  private preloader?: Preloader;
+  private preloaderInitialized = false;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
@@ -49,11 +51,9 @@ export class EvmProvider extends BaseProvider {
     instance,
     log,
     abis,
-    writers,
-    preloader
+    writers
   }: ConstructorParameters<typeof BaseProvider>[0] & {
     writers: Record<string, Writer>;
-    preloader?: Preloader;
   }) {
     super({ instance, log, abis });
 
@@ -63,7 +63,6 @@ export class EvmProvider extends BaseProvider {
       })
     });
 
-    this.preloader = preloader;
     this.writers = writers;
   }
 
@@ -503,15 +502,10 @@ export class EvmProvider extends BaseProvider {
     toBlock: number;
     sources: ContractSourceConfig[];
   }): Promise<Log[]> {
-    const chunks: ContractSourceConfig[][] = [];
-    for (let i = 0; i < sources.length; i += 20) {
-      chunks.push(sources.slice(i, i + 20));
-    }
-
     let events: Log[] = [];
-    for (const chunk of chunks) {
-      const address = chunk.map(source => source.contract);
-      const topics = chunk.flatMap(source =>
+    for (const sourceChunk of chunk(sources, 20)) {
+      const address = sourceChunk.map(source => source.contract);
+      const topics = sourceChunk.flatMap(source =>
         source.events.map(event => this.getEventHash(event.name))
       );
 
@@ -524,40 +518,44 @@ export class EvmProvider extends BaseProvider {
     return events;
   }
 
+  private async getPreloader(): Promise<Preloader | undefined> {
+    if (!this.preloaderInitialized) {
+      this.preloaderInitialized = true;
+      const chainId = await this.client.getChainId();
+      this.preloader = createPreloader(this.instance.config, chainId, this.log);
+    }
+    return this.preloader;
+  }
+
   async getCheckpointsRange(
     fromBlock: number,
     toBlock: number
   ): Promise<CheckpointRecord[]> {
     const sources = this.instance.getCurrentSources(toBlock);
+    this.blockCache.clear();
 
-    let checkpoints: CheckpointRecord[];
+    const preloader = await this.getPreloader();
+
     let logs: Log[];
 
-    if (this.preloader) {
-      const result = await this.preloader.getCheckpointsRange(
+    if (preloader) {
+      const result = await preloader.getCheckpointsRange(
         fromBlock,
         toBlock,
         sources,
         name => this.getEventHash(name)
       );
-      checkpoints = result.checkpoints;
       logs = result.logs;
 
       for (const block of result.blocks) {
         this.blockCache.set(block.number, block);
       }
     } else {
-      const events = await this.getLogsForSources({
+      logs = await this.getLogsForSources({
         fromBlock,
         toBlock,
         sources
       });
-
-      checkpoints = events.map(log => ({
-        blockNumber: Number(log.blockNumber),
-        contractAddress: log.address
-      }));
-      logs = events;
     }
 
     for (const log of logs) {
@@ -570,7 +568,10 @@ export class EvmProvider extends BaseProvider {
       this.logsCache.get(log.blockNumber)?.push(log);
     }
 
-    return checkpoints;
+    return logs.map(log => ({
+      blockNumber: Number(log.blockNumber),
+      contractAddress: log.address
+    }));
   }
 
   getEventHash(eventName: string) {

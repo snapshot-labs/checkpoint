@@ -1,6 +1,5 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
-import { createPreloader } from './preloaders';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
@@ -25,8 +24,7 @@ export class EvmIndexer extends BaseIndexer {
       instance,
       log,
       abis,
-      writers: this.writers,
-      preloader: createPreloader(instance.config, log)
+      writers: this.writers
     });
   }
 

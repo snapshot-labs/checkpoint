@@ -1,7 +1,7 @@
 import { Log } from 'viem';
-import { CheckpointRecord } from '../../../stores/checkpoints';
-import { ContractSourceConfig } from '../../../types';
 import { FetchedBlock, Preloader } from './types';
+import { ContractSourceConfig } from '../../../types';
+import { chunk } from '../../../utils/helpers';
 
 type HypersyncLog = {
   block_number?: number;
@@ -53,33 +53,12 @@ const FIELD_SELECTION = {
 };
 
 export class HypersyncPreloader implements Preloader {
-  private url: string | null = null;
+  private readonly url: string;
   private readonly apiToken: string;
-  private readonly rpcUrl: string;
 
-  constructor({ apiToken, rpcUrl }: { apiToken: string; rpcUrl: string }) {
+  constructor({ apiToken, chainId }: { apiToken: string; chainId: number }) {
     this.apiToken = apiToken;
-    this.rpcUrl = rpcUrl;
-  }
-
-  private async getUrl(): Promise<string> {
-    if (!this.url) {
-      const res = await fetch(this.rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_chainId',
-          params: []
-        })
-      });
-      const json = await res.json();
-      const chainId = parseInt(json.result, 16);
-      this.url = `https://${chainId}.hypersync.xyz`;
-    }
-
-    return this.url;
+    this.url = `https://${chainId}.hypersync.xyz`;
   }
 
   async getCheckpointsRange(
@@ -88,21 +67,15 @@ export class HypersyncPreloader implements Preloader {
     sources: ContractSourceConfig[],
     getEventHash: (name: string) => string
   ): Promise<{
-    checkpoints: CheckpointRecord[];
     logs: Log[];
     blocks: FetchedBlock[];
   }> {
-    const chunks: ContractSourceConfig[][] = [];
-    for (let i = 0; i < sources.length; i += 20) {
-      chunks.push(sources.slice(i, i + 20));
-    }
-
-    let allLogs: Log[] = [];
+    const allLogs: Log[] = [];
     const allBlocks: FetchedBlock[] = [];
 
-    for (const chunk of chunks) {
-      const addresses = chunk.map(source => source.contract);
-      const topics = chunk.flatMap(source =>
+    for (const sourceChunk of chunk(sources, 20)) {
+      const addresses = sourceChunk.map(source => source.contract);
+      const topics = sourceChunk.flatMap(source =>
         source.events.map(event => getEventHash(event.name))
       );
 
@@ -112,16 +85,11 @@ export class HypersyncPreloader implements Preloader {
         addresses,
         [topics]
       );
-      allLogs = allLogs.concat(logs);
-      allBlocks.push(...blocks);
+      for (const log of logs) allLogs.push(log);
+      for (const block of blocks) allBlocks.push(block);
     }
 
-    const checkpoints = allLogs.map(log => ({
-      blockNumber: Number(log.blockNumber),
-      contractAddress: log.address
-    }));
-
-    return { checkpoints, logs: allLogs, blocks: allBlocks };
+    return { logs: allLogs, blocks: allBlocks };
   }
 
   private async fetchLogs(
@@ -137,7 +105,7 @@ export class HypersyncPreloader implements Preloader {
           : [topics[0]]
         : undefined;
 
-    let allLogs: HypersyncLog[] = [];
+    const allLogs: HypersyncLog[] = [];
     const allBlocks: FetchedBlock[] = [];
     let currentFrom = fromBlock;
     const exclusiveToBlock = toBlock + 1;
@@ -155,8 +123,9 @@ export class HypersyncPreloader implements Preloader {
         field_selection: FIELD_SELECTION
       });
 
-      allBlocks.push(...this.convertBlocks(response.data.blocks));
-      allLogs = allLogs.concat(response.data.logs);
+      for (const block of this.convertBlocks(response.data.blocks))
+        allBlocks.push(block);
+      for (const log of response.data.logs) allLogs.push(log);
 
       if (response.next_block >= exclusiveToBlock) break;
       currentFrom = response.next_block;
@@ -168,7 +137,7 @@ export class HypersyncPreloader implements Preloader {
   private async query(
     body: Record<string, unknown>
   ): Promise<HypersyncResponse> {
-    const url = await this.getUrl();
+    const url = this.url;
     const res = await fetch(`${url}/query`, {
       method: 'POST',
       headers: {
@@ -221,9 +190,7 @@ export class HypersyncPreloader implements Preloader {
         blockNumber: log.block_number != null ? BigInt(log.block_number) : null,
         data: (log.data ?? '0x') as `0x${string}`,
         logIndex: log.log_index ?? 0,
-        transactionHash: (log.transaction_hash ?? null) as
-          | `0x${string}`
-          | null,
+        transactionHash: (log.transaction_hash ?? null) as `0x${string}` | null,
         transactionIndex: log.transaction_index ?? 0,
         removed: log.removed ?? false,
         topics

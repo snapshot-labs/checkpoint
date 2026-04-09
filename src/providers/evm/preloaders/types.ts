@@ -1,5 +1,4 @@
 import { Log } from 'viem';
-import { CheckpointRecord } from '../../../stores/checkpoints';
 import { ContractSourceConfig } from '../../../types';
 
 export type FetchedBlock = {
@@ -16,7 +15,6 @@ export type Preloader = {
     sources: ContractSourceConfig[],
     getEventHash: (name: string) => string
   ): Promise<{
-    checkpoints: CheckpointRecord[];
     logs: Log[];
     blocks: FetchedBlock[];
   }>;
