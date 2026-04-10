@@ -17,7 +17,7 @@ import { FetchedBlock, Preloader } from './preloaders/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
-import { chunk, sleep } from '../../utils/helpers';
+import { sleep } from '../../utils/helpers';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 
 type GetLogsBlockHashFilter = {
@@ -502,10 +502,15 @@ export class EvmProvider extends BaseProvider {
     toBlock: number;
     sources: ContractSourceConfig[];
   }): Promise<Log[]> {
+    const chunks: ContractSourceConfig[][] = [];
+    for (let i = 0; i < sources.length; i += 20) {
+      chunks.push(sources.slice(i, i + 20));
+    }
+
     let events: Log[] = [];
-    for (const sourceChunk of chunk(sources, 20)) {
-      const address = sourceChunk.map(source => source.contract);
-      const topics = sourceChunk.flatMap(source =>
+    for (const chunk of chunks) {
+      const address = chunk.map(source => source.contract);
+      const topics = chunk.flatMap(source =>
         source.events.map(event => this.getEventHash(event.name))
       );
 
@@ -536,7 +541,7 @@ export class EvmProvider extends BaseProvider {
 
     const preloader = await this.getPreloader();
 
-    let logs: Log[];
+    let events: Log[];
 
     if (preloader) {
       const result = await preloader.getCheckpointsRange(
@@ -545,20 +550,20 @@ export class EvmProvider extends BaseProvider {
         sources,
         name => this.getEventHash(name)
       );
-      logs = result.logs;
+      events = result.logs;
 
       for (const block of result.blocks) {
         this.blockCache.set(block.number, block);
       }
     } else {
-      logs = await this.getLogsForSources({
+      events = await this.getLogsForSources({
         fromBlock,
         toBlock,
         sources
       });
     }
 
-    for (const log of logs) {
+    for (const log of events) {
       if (log.blockNumber === null) continue;
 
       if (!this.logsCache.has(log.blockNumber)) {
@@ -568,7 +573,7 @@ export class EvmProvider extends BaseProvider {
       this.logsCache.get(log.blockNumber)?.push(log);
     }
 
-    return logs.map(log => ({
+    return events.map(log => ({
       blockNumber: Number(log.blockNumber),
       contractAddress: log.address
     }));
