@@ -84,7 +84,12 @@ export class HypersyncPreloader implements Preloader {
 
         // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
         for (const block of response.data.blocks) {
-          if (block.number != null && block.timestamp != null && block.hash && block.parent_hash) {
+          if (
+            block.number != null &&
+            block.timestamp != null &&
+            block.hash &&
+            block.parent_hash
+          ) {
             allBlocks.push({
               number: block.number,
               hash: block.hash,
@@ -95,17 +100,23 @@ export class HypersyncPreloader implements Preloader {
         }
 
         for (const log of response.data.logs) {
-          const topics = [log.topic0, log.topic1, log.topic2, log.topic3].filter(
-            (t): t is string => !!t
-          ) as `0x${string}`[];
+          const topics = [
+            log.topic0,
+            log.topic1,
+            log.topic2,
+            log.topic3
+          ].filter((t): t is string => !!t) as `0x${string}`[];
 
           allLogs.push({
             address: (log.address ?? '0x') as `0x${string}`,
             blockHash: (log.block_hash ?? null) as `0x${string}` | null,
-            blockNumber: log.block_number != null ? BigInt(log.block_number) : null,
+            blockNumber:
+              log.block_number != null ? BigInt(log.block_number) : null,
             data: (log.data ?? '0x') as `0x${string}`,
             logIndex: log.log_index ?? 0,
-            transactionHash: (log.transaction_hash ?? null) as `0x${string}` | null,
+            transactionHash: (log.transaction_hash ?? null) as
+              | `0x${string}`
+              | null,
             transactionIndex: log.transaction_index ?? 0,
             removed: log.removed ?? false,
             topics
@@ -120,7 +131,9 @@ export class HypersyncPreloader implements Preloader {
     return { logs: allLogs, blocks: allBlocks };
   }
 
-  private async query(body: Record<string, unknown>): Promise<HypersyncResponse> {
+  private async query(
+    body: Record<string, unknown>
+  ): Promise<HypersyncResponse> {
     const res = await fetch(`${this.url}/query`, {
       method: 'POST',
       headers: {
