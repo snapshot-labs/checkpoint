@@ -1,7 +1,16 @@
 import { Log } from 'viem';
-import { FetchedBlock, Preloader } from './types';
-import { ContractSourceConfig } from '../../../types';
-import { chunk } from '../../../utils/helpers';
+import { EvmProvider } from './provider';
+import { Block } from './types';
+import { CheckpointRecord } from '../../stores/checkpoints';
+import { ContractSourceConfig } from '../../types';
+import { chunk } from '../../utils/helpers';
+
+type FetchedBlock = {
+  number: number;
+  hash: string;
+  parentHash: string;
+  timestamp: number;
+};
 
 type HypersyncResponse = {
   next_block: number;
@@ -47,20 +56,72 @@ const FIELD_SELECTION = {
   ]
 };
 
-export class HypersyncPreloader implements Preloader {
-  private readonly url: string;
+export class HyperSyncEvmProvider extends EvmProvider {
   private readonly apiToken: string;
+  private hypersyncUrl?: string;
+  private blockCache = new Map<number, FetchedBlock>();
 
-  constructor({ apiToken, chainId }: { apiToken: string; chainId: number }) {
-    this.apiToken = apiToken;
-    this.url = `https://${chainId}.hypersync.xyz`;
+  constructor(
+    params: ConstructorParameters<typeof EvmProvider>[0] & {
+      apiToken: string;
+    }
+  ) {
+    super(params);
+    this.apiToken = params.apiToken;
+  }
+
+  protected async fetchBlock(blockNumber: number): Promise<Block> {
+    const cached = this.blockCache.get(blockNumber);
+    if (cached) {
+      this.blockCache.delete(blockNumber);
+      return {
+        number: BigInt(cached.number),
+        hash: cached.hash,
+        parentHash: cached.parentHash,
+        timestamp: BigInt(cached.timestamp)
+      } as Block;
+    }
+
+    return super.fetchBlock(blockNumber);
   }
 
   async getCheckpointsRange(
     fromBlock: number,
+    toBlock: number
+  ): Promise<CheckpointRecord[]> {
+    const sources = this.instance.getCurrentSources(toBlock);
+    this.blockCache.clear();
+
+    const { logs, blocks } = await this.queryCheckpointsRange(
+      fromBlock,
+      toBlock,
+      sources
+    );
+
+    for (const block of blocks) {
+      this.blockCache.set(block.number, block);
+    }
+
+    for (const log of logs) {
+      if (log.blockNumber === null) continue;
+
+      if (!this.logsCache.has(log.blockNumber)) {
+        this.logsCache.set(log.blockNumber, []);
+      }
+
+      this.logsCache.get(log.blockNumber)?.push(log);
+    }
+
+    return logs.map(log => ({
+      blockNumber: Number(log.blockNumber),
+      contractAddress: log.address
+    }));
+  }
+
+  private async queryCheckpointsRange(
+    fromBlock: number,
     toBlock: number,
-    sources: ContractSourceConfig[],
-    getEventHash: (name: string) => string
+    sources: ContractSourceConfig[]
   ): Promise<{ logs: Log[]; blocks: FetchedBlock[] }> {
     const allLogs: Log[] = [];
     const allBlocks: FetchedBlock[] = [];
@@ -68,7 +129,7 @@ export class HypersyncPreloader implements Preloader {
     for (const sourceChunk of chunk(sources, 20)) {
       const addresses = sourceChunk.map(source => source.contract);
       const topic0 = sourceChunk.flatMap(source =>
-        source.events.map(event => getEventHash(event.name))
+        source.events.map(event => this.getEventHash(event.name))
       );
 
       let currentFrom = fromBlock;
@@ -131,10 +192,20 @@ export class HypersyncPreloader implements Preloader {
     return { logs: allLogs, blocks: allBlocks };
   }
 
+  private async getHypersyncUrl(): Promise<string> {
+    if (!this.hypersyncUrl) {
+      const chainId = await this.getChainId();
+      this.hypersyncUrl = `https://${chainId}.hypersync.xyz`;
+    }
+    return this.hypersyncUrl;
+  }
+
   private async query(
     body: Record<string, unknown>
   ): Promise<HypersyncResponse> {
-    const res = await fetch(`${this.url}/query`, {
+    const url = await this.getHypersyncUrl();
+
+    const res = await fetch(`${url}/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -12,8 +12,6 @@ import {
   stringToBytes
 } from 'viem';
 import { getRangeHint } from './helpers';
-import { createPreloader } from './preloaders';
-import { FetchedBlock, Preloader } from './preloaders/types';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
@@ -39,13 +37,10 @@ const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
-  private preloader?: Preloader;
-  private preloaderInitialized = false;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
-  private logsCache = new Map<bigint, Log[]>();
-  private blockCache = new Map<number, FetchedBlock>();
+  protected logsCache = new Map<bigint, Log[]>();
 
   constructor({
     instance,
@@ -70,6 +65,10 @@ export class EvmProvider extends BaseProvider {
     return addresses.map(address => getAddress(address));
   }
 
+  protected async getChainId(): Promise<number> {
+    return this.client.getChainId();
+  }
+
   async getNetworkIdentifier(): Promise<string> {
     const chainId = await this.client.getChainId();
 
@@ -90,6 +89,12 @@ export class EvmProvider extends BaseProvider {
     return block.hash;
   }
 
+  protected async fetchBlock(blockNumber: number): Promise<Block> {
+    return this.client.getBlock({
+      blockNumber: BigInt(blockNumber)
+    });
+  }
+
   async processBlock(blockNumber: number, parentHash: string | null) {
     let block: Block | null = null;
     let eventsData: EventsData;
@@ -100,20 +105,7 @@ export class EvmProvider extends BaseProvider {
 
     try {
       if (!hasPreloadedBlockEvents) {
-        const cached = this.blockCache.get(blockNumber);
-        if (cached) {
-          this.blockCache.delete(blockNumber);
-          block = {
-            number: BigInt(cached.number),
-            hash: cached.hash,
-            parentHash: cached.parentHash,
-            timestamp: BigInt(cached.timestamp)
-          } as Block;
-        } else {
-          block = await this.client.getBlock({
-            blockNumber: BigInt(blockNumber)
-          });
-        }
+        block = await this.fetchBlock(blockNumber);
       }
     } catch (err) {
       this.log.error({ blockNumber, err }, 'getting block failed... retrying');
@@ -493,7 +485,7 @@ export class EvmProvider extends BaseProvider {
     return result;
   }
 
-  async getLogsForSources({
+  protected async getLogsForSources({
     fromBlock,
     toBlock,
     sources
@@ -523,45 +515,15 @@ export class EvmProvider extends BaseProvider {
     return events;
   }
 
-  private async getPreloader(): Promise<Preloader | undefined> {
-    if (!this.preloaderInitialized) {
-      this.preloaderInitialized = true;
-      const chainId = await this.client.getChainId();
-      this.preloader = createPreloader(this.instance.config, chainId, this.log);
-    }
-    return this.preloader;
-  }
-
   async getCheckpointsRange(
     fromBlock: number,
     toBlock: number
   ): Promise<CheckpointRecord[]> {
-    const sources = this.instance.getCurrentSources(toBlock);
-    this.blockCache.clear();
-
-    const preloader = await this.getPreloader();
-
-    let events: Log[];
-
-    if (preloader) {
-      const result = await preloader.getCheckpointsRange(
-        fromBlock,
-        toBlock,
-        sources,
-        name => this.getEventHash(name)
-      );
-      events = result.logs;
-
-      for (const block of result.blocks) {
-        this.blockCache.set(block.number, block);
-      }
-    } else {
-      events = await this.getLogsForSources({
-        fromBlock,
-        toBlock,
-        sources
-      });
-    }
+    const events = await this.getLogsForSources({
+      fromBlock,
+      toBlock,
+      sources: this.instance.getCurrentSources(toBlock)
+    });
 
     for (const log of events) {
       if (log.blockNumber === null) continue;
