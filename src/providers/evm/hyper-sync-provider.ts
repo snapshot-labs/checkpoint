@@ -11,7 +11,7 @@ type FetchedBlock = {
   timestamp: number;
 };
 
-type HypersyncResponse = {
+type HyperSyncResponse = {
   next_block: number;
   data: {
     blocks: {
@@ -57,7 +57,7 @@ const FIELD_SELECTION = {
 
 export class HyperSyncEvmProvider extends EvmProvider {
   private readonly apiToken: string;
-  private hypersyncUrl?: string;
+  private hyperSyncUrl?: string;
   private blockCache = new Map<number, FetchedBlock>();
 
   constructor(
@@ -189,18 +189,18 @@ export class HyperSyncEvmProvider extends EvmProvider {
     return { logs: allLogs, blocks: allBlocks };
   }
 
-  private async getHypersyncUrl(): Promise<string> {
-    if (!this.hypersyncUrl) {
+  private async getHyperSyncUrl(): Promise<string> {
+    if (!this.hyperSyncUrl) {
       const chainId = await this.getChainId();
-      this.hypersyncUrl = `https://${chainId}.hypersync.xyz`;
+      this.hyperSyncUrl = `https://${chainId}.hypersync.xyz`;
     }
-    return this.hypersyncUrl;
+    return this.hyperSyncUrl;
   }
 
   private async query(
     body: Record<string, unknown>
-  ): Promise<HypersyncResponse> {
-    const url = await this.getHypersyncUrl();
+  ): Promise<HyperSyncResponse> {
+    const url = await this.getHyperSyncUrl();
 
     const res = await fetch(`${url}/query`, {
       method: 'POST',
