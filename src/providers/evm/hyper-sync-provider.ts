@@ -14,13 +14,13 @@ type FetchedBlock = {
 type HyperSyncResponse = {
   next_block: number;
   data: {
-    blocks: {
+    blocks?: {
       number: number;
       timestamp: number;
       hash: string;
       parent_hash: string;
     }[];
-    logs: {
+    logs?: {
       block_number: number;
       log_index: number;
       transaction_index: number;
@@ -142,7 +142,7 @@ export class HyperSyncEvmProvider extends EvmProvider {
       });
 
       // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
-      for (const block of response.data.blocks) {
+      for (const block of response.data.blocks ?? []) {
         allBlocks.push({
           number: block.number,
           hash: block.hash,
@@ -151,13 +151,10 @@ export class HyperSyncEvmProvider extends EvmProvider {
         });
       }
 
-      for (const log of response.data.logs) {
-        const topics = [
-          log.topic0,
-          log.topic1,
-          log.topic2,
-          log.topic3
-        ].filter((t): t is string => !!t) as `0x${string}`[];
+      for (const log of response.data.logs ?? []) {
+        const topics = [log.topic0, log.topic1, log.topic2, log.topic3].filter(
+          (t): t is string => !!t
+        ) as `0x${string}`[];
 
         allLogs.push({
           address: log.address as `0x${string}`,
