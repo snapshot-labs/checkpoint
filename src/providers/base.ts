@@ -90,6 +90,10 @@ export class BaseProvider {
     );
   }
 
+  getPreloadRange(): number | null {
+    return null;
+  }
+
   async getCheckpointsRange(
     fromBlock: number,
     toBlock: number

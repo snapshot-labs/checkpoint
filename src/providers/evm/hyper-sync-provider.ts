@@ -11,30 +11,34 @@ type FetchedBlock = {
   timestamp: number;
 };
 
+type HyperSyncBlock = {
+  number: number;
+  timestamp: number;
+  hash: string;
+  parent_hash: string;
+};
+
+type HyperSyncLog = {
+  block_number: number;
+  log_index: number;
+  transaction_index: number;
+  transaction_hash: string;
+  block_hash: string;
+  address: string;
+  data: string;
+  topic0: string | null;
+  topic1: string | null;
+  topic2: string | null;
+  topic3: string | null;
+  removed: boolean;
+};
+
 type HyperSyncResponse = {
   next_block: number;
   data: {
-    blocks?: {
-      number: number;
-      timestamp: number;
-      hash: string;
-      parent_hash: string;
-    }[];
-    logs?: {
-      block_number: number;
-      log_index: number;
-      transaction_index: number;
-      transaction_hash: string;
-      block_hash: string;
-      address: string;
-      data: string;
-      topic0: string | null;
-      topic1: string | null;
-      topic2: string | null;
-      topic3: string | null;
-      removed: boolean;
-    }[];
-  };
+    blocks?: HyperSyncBlock[];
+    logs?: HyperSyncLog[];
+  }[];
 };
 
 const FIELD_SELECTION = {
@@ -67,6 +71,10 @@ export class HyperSyncEvmProvider extends EvmProvider {
   ) {
     super(params);
     this.apiToken = params.apiToken;
+  }
+
+  getPreloadRange(): number {
+    return Infinity;
   }
 
   async getCheckpointsRange(
@@ -141,32 +149,37 @@ export class HyperSyncEvmProvider extends EvmProvider {
         field_selection: FIELD_SELECTION
       });
 
-      // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
-      for (const block of response.data.blocks ?? []) {
-        allBlocks.push({
-          number: block.number,
-          hash: block.hash,
-          parentHash: block.parent_hash,
-          timestamp: block.timestamp
-        });
-      }
+      for (const chunk of response.data) {
+        // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
+        for (const block of chunk.blocks ?? []) {
+          allBlocks.push({
+            number: block.number,
+            hash: block.hash,
+            parentHash: block.parent_hash,
+            timestamp: block.timestamp
+          });
+        }
 
-      for (const log of response.data.logs ?? []) {
-        const topics = [log.topic0, log.topic1, log.topic2, log.topic3].filter(
-          (t): t is string => !!t
-        ) as `0x${string}`[];
+        for (const log of chunk.logs ?? []) {
+          const topics = [
+            log.topic0,
+            log.topic1,
+            log.topic2,
+            log.topic3
+          ].filter((t): t is string => !!t) as `0x${string}`[];
 
-        allLogs.push({
-          address: log.address as `0x${string}`,
-          blockHash: log.block_hash as `0x${string}`,
-          blockNumber: BigInt(log.block_number),
-          data: log.data as `0x${string}`,
-          logIndex: log.log_index,
-          transactionHash: log.transaction_hash as `0x${string}`,
-          transactionIndex: log.transaction_index,
-          removed: log.removed,
-          topics
-        } as Log);
+          allLogs.push({
+            address: log.address as `0x${string}`,
+            blockHash: log.block_hash as `0x${string}`,
+            blockNumber: BigInt(log.block_number),
+            data: log.data as `0x${string}`,
+            logIndex: log.log_index,
+            transactionHash: log.transaction_hash as `0x${string}`,
+            transactionIndex: log.transaction_index,
+            removed: log.removed,
+            topics
+          } as Log);
+        }
       }
 
       if (response.next_block >= exclusiveTo) break;
