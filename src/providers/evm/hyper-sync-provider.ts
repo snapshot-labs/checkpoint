@@ -3,7 +3,6 @@ import { EvmProvider } from './provider';
 import { Block } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
-import { chunk } from '../../utils/helpers';
 
 type FetchedBlock = {
   number: number;
@@ -126,67 +125,65 @@ export class HyperSyncEvmProvider extends EvmProvider {
     const allLogs: Log[] = [];
     const allBlocks: FetchedBlock[] = [];
 
-    for (const sourceChunk of chunk(sources, 20)) {
-      const addresses = sourceChunk.map(source => source.contract);
-      const topic0 = sourceChunk.flatMap(source =>
-        source.events.map(event => this.getEventHash(event.name))
-      );
+    const addresses = sources.map(source => source.contract);
+    const topic0 = sources.flatMap(source =>
+      source.events.map(event => this.getEventHash(event.name))
+    );
 
-      let currentFrom = fromBlock;
-      const exclusiveTo = toBlock + 1;
+    let currentFrom = fromBlock;
+    const exclusiveTo = toBlock + 1;
 
-      while (currentFrom < exclusiveTo) {
-        const response = await this.query({
-          from_block: currentFrom,
-          to_block: exclusiveTo,
-          logs: [{ address: addresses, topics: [topic0] }],
-          field_selection: FIELD_SELECTION
-        });
+    while (currentFrom < exclusiveTo) {
+      const response = await this.query({
+        from_block: currentFrom,
+        to_block: exclusiveTo,
+        logs: [{ address: addresses, topics: [topic0] }],
+        field_selection: FIELD_SELECTION
+      });
 
-        // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
-        for (const block of response.data.blocks) {
-          if (
-            block.number != null &&
-            block.timestamp != null &&
-            block.hash &&
-            block.parent_hash
-          ) {
-            allBlocks.push({
-              number: block.number,
-              hash: block.hash,
-              parentHash: block.parent_hash,
-              timestamp: block.timestamp
-            });
-          }
+      // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
+      for (const block of response.data.blocks) {
+        if (
+          block.number != null &&
+          block.timestamp != null &&
+          block.hash &&
+          block.parent_hash
+        ) {
+          allBlocks.push({
+            number: block.number,
+            hash: block.hash,
+            parentHash: block.parent_hash,
+            timestamp: block.timestamp
+          });
         }
-
-        for (const log of response.data.logs) {
-          const topics = [
-            log.topic0,
-            log.topic1,
-            log.topic2,
-            log.topic3
-          ].filter((t): t is string => !!t) as `0x${string}`[];
-
-          allLogs.push({
-            address: (log.address ?? '0x') as `0x${string}`,
-            blockHash: (log.block_hash ?? null) as `0x${string}` | null,
-            blockNumber:
-              log.block_number != null ? BigInt(log.block_number) : null,
-            data: (log.data ?? '0x') as `0x${string}`,
-            logIndex: log.log_index ?? 0,
-            transactionHash: (log.transaction_hash ?? null) as
-              | `0x${string}`
-              | null,
-            transactionIndex: log.transaction_index ?? 0,
-            removed: log.removed ?? false,
-            topics
-          } as Log);
-        }
-
-        if (response.next_block >= exclusiveTo) break;
-        currentFrom = response.next_block;
       }
+
+      for (const log of response.data.logs) {
+        const topics = [
+          log.topic0,
+          log.topic1,
+          log.topic2,
+          log.topic3
+        ].filter((t): t is string => !!t) as `0x${string}`[];
+
+        allLogs.push({
+          address: (log.address ?? '0x') as `0x${string}`,
+          blockHash: (log.block_hash ?? null) as `0x${string}` | null,
+          blockNumber:
+            log.block_number != null ? BigInt(log.block_number) : null,
+          data: (log.data ?? '0x') as `0x${string}`,
+          logIndex: log.log_index ?? 0,
+          transactionHash: (log.transaction_hash ?? null) as
+            | `0x${string}`
+            | null,
+          transactionIndex: log.transaction_index ?? 0,
+          removed: log.removed ?? false,
+          topics
+        } as Log);
+      }
+
+      if (response.next_block >= exclusiveTo) break;
+      currentFrom = response.next_block;
     }
 
     return { logs: allLogs, blocks: allBlocks };
