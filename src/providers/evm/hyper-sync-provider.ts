@@ -67,6 +67,11 @@ export class HyperSyncEvmProvider extends EvmProvider {
     }
   ) {
     super(params);
+
+    if (!params.apiToken) {
+      throw new Error('HyperSync API token is required');
+    }
+
     this.apiToken = params.apiToken;
   }
 
