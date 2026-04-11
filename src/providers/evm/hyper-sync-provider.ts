@@ -70,21 +70,6 @@ export class HyperSyncEvmProvider extends EvmProvider {
     this.apiToken = params.apiToken;
   }
 
-  protected async fetchBlock(blockNumber: number): Promise<Block> {
-    const cached = this.blockCache.get(blockNumber);
-    if (cached) {
-      this.blockCache.delete(blockNumber);
-      return {
-        number: BigInt(cached.number),
-        hash: cached.hash,
-        parentHash: cached.parentHash,
-        timestamp: BigInt(cached.timestamp)
-      } as Block;
-    }
-
-    return super.fetchBlock(blockNumber);
-  }
-
   async getCheckpointsRange(
     fromBlock: number,
     toBlock: number
@@ -116,6 +101,21 @@ export class HyperSyncEvmProvider extends EvmProvider {
       blockNumber: Number(log.blockNumber),
       contractAddress: log.address
     }));
+  }
+
+  protected async fetchBlock(blockNumber: number): Promise<Block> {
+    const cached = this.blockCache.get(blockNumber);
+    if (cached) {
+      this.blockCache.delete(blockNumber);
+      return {
+        number: BigInt(cached.number),
+        hash: cached.hash,
+        parentHash: cached.parentHash,
+        timestamp: BigInt(cached.timestamp)
+      } as Block;
+    }
+
+    return super.fetchBlock(blockNumber);
   }
 
   private async queryCheckpointsRange(
