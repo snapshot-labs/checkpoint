@@ -15,24 +15,24 @@ type HyperSyncResponse = {
   next_block: number;
   data: {
     blocks: {
-      number?: number;
-      timestamp?: number;
-      hash?: string;
-      parent_hash?: string;
+      number: number;
+      timestamp: number;
+      hash: string;
+      parent_hash: string;
     }[];
     logs: {
-      block_number?: number;
-      log_index?: number;
-      transaction_index?: number;
-      transaction_hash?: string;
-      block_hash?: string;
-      address?: string;
-      data?: string;
-      topic0?: string | null;
-      topic1?: string | null;
-      topic2?: string | null;
-      topic3?: string | null;
-      removed?: boolean;
+      block_number: number;
+      log_index: number;
+      transaction_index: number;
+      transaction_hash: string;
+      block_hash: string;
+      address: string;
+      data: string;
+      topic0: string | null;
+      topic1: string | null;
+      topic2: string | null;
+      topic3: string | null;
+      removed: boolean;
     }[];
   };
 };
@@ -143,19 +143,12 @@ export class HyperSyncEvmProvider extends EvmProvider {
 
       // NOTE: do not replace for/push with spread — spread causes stack overflow on large arrays
       for (const block of response.data.blocks) {
-        if (
-          block.number != null &&
-          block.timestamp != null &&
-          block.hash &&
-          block.parent_hash
-        ) {
-          allBlocks.push({
-            number: block.number,
-            hash: block.hash,
-            parentHash: block.parent_hash,
-            timestamp: block.timestamp
-          });
-        }
+        allBlocks.push({
+          number: block.number,
+          hash: block.hash,
+          parentHash: block.parent_hash,
+          timestamp: block.timestamp
+        });
       }
 
       for (const log of response.data.logs) {
@@ -167,17 +160,14 @@ export class HyperSyncEvmProvider extends EvmProvider {
         ].filter((t): t is string => !!t) as `0x${string}`[];
 
         allLogs.push({
-          address: (log.address ?? '0x') as `0x${string}`,
-          blockHash: (log.block_hash ?? null) as `0x${string}` | null,
-          blockNumber:
-            log.block_number != null ? BigInt(log.block_number) : null,
-          data: (log.data ?? '0x') as `0x${string}`,
-          logIndex: log.log_index ?? 0,
-          transactionHash: (log.transaction_hash ?? null) as
-            | `0x${string}`
-            | null,
-          transactionIndex: log.transaction_index ?? 0,
-          removed: log.removed ?? false,
+          address: log.address as `0x${string}`,
+          blockHash: log.block_hash as `0x${string}`,
+          blockNumber: BigInt(log.block_number),
+          data: log.data as `0x${string}`,
+          logIndex: log.log_index,
+          transactionHash: log.transaction_hash as `0x${string}`,
+          transactionIndex: log.transaction_index,
+          removed: log.removed,
           topics
         } as Log);
       }
