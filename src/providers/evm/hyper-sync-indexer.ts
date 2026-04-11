@@ -5,12 +5,12 @@ import { Writer } from './types';
 
 export class HyperSyncEvmIndexer extends BaseIndexer {
   private writers: Record<string, Writer>;
-  private apiToken: string;
+  private options: { apiToken: string };
 
-  constructor(writers: Record<string, Writer>, apiToken: string) {
+  constructor(writers: Record<string, Writer>, options: { apiToken: string }) {
     super();
     this.writers = writers;
-    this.apiToken = apiToken;
+    this.options = options;
   }
 
   init({
@@ -29,7 +29,7 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
       log,
       abis,
       writers: this.writers,
-      apiToken: this.apiToken
+      apiToken: this.options.apiToken
     });
   }
 
