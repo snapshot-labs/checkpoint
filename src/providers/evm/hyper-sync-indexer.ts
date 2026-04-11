@@ -9,6 +9,11 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
 
   constructor(writers: Record<string, Writer>, options: { apiToken: string }) {
     super();
+
+    if (!options.apiToken) {
+      throw new Error('HyperSync API token is required');
+    }
+
     this.writers = writers;
     this.options = options;
   }
