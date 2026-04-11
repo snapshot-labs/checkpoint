@@ -1,5 +1,5 @@
 export { EvmProvider } from './provider';
-export { HyperSyncEvmProvider } from './hypersync-provider';
+export { HyperSyncEvmProvider } from './hyper-sync-provider';
 export { EvmIndexer } from './indexer';
-export { HyperSyncEvmIndexer } from './hypersync-indexer';
+export { HyperSyncEvmIndexer } from './hyper-sync-indexer';
 export * from './types';
