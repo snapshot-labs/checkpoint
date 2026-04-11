@@ -65,10 +65,6 @@ export class EvmProvider extends BaseProvider {
     return addresses.map(address => getAddress(address));
   }
 
-  protected async getChainId(): Promise<number> {
-    return this.client.getChainId();
-  }
-
   async getNetworkIdentifier(): Promise<string> {
     const chainId = await this.client.getChainId();
 
@@ -87,12 +83,6 @@ export class EvmProvider extends BaseProvider {
     });
 
     return block.hash;
-  }
-
-  protected async fetchBlock(blockNumber: number): Promise<Block> {
-    return this.client.getBlock({
-      blockNumber: BigInt(blockNumber)
-    });
   }
 
   async processBlock(blockNumber: number, parentHash: string | null) {
@@ -485,36 +475,6 @@ export class EvmProvider extends BaseProvider {
     return result;
   }
 
-  protected async getLogsForSources({
-    fromBlock,
-    toBlock,
-    sources
-  }: {
-    fromBlock: number;
-    toBlock: number;
-    sources: ContractSourceConfig[];
-  }): Promise<Log[]> {
-    const chunks: ContractSourceConfig[][] = [];
-    for (let i = 0; i < sources.length; i += 20) {
-      chunks.push(sources.slice(i, i + 20));
-    }
-
-    let events: Log[] = [];
-    for (const chunk of chunks) {
-      const address = chunk.map(source => source.contract);
-      const topics = chunk.flatMap(source =>
-        source.events.map(event => this.getEventHash(event.name))
-      );
-
-      const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [
-        topics
-      ]);
-      events = events.concat(chunkEvents);
-    }
-
-    return events;
-  }
-
   async getCheckpointsRange(
     fromBlock: number,
     toBlock: number
@@ -556,5 +516,45 @@ export class EvmProvider extends BaseProvider {
   handleNewSourceAdded(): void {
     this.log.info('new source added, clearing logs cache');
     this.logsCache.clear();
+  }
+
+  protected async getChainId(): Promise<number> {
+    return this.client.getChainId();
+  }
+
+  protected async fetchBlock(blockNumber: number): Promise<Block> {
+    return this.client.getBlock({
+      blockNumber: BigInt(blockNumber)
+    });
+  }
+
+  protected async getLogsForSources({
+    fromBlock,
+    toBlock,
+    sources
+  }: {
+    fromBlock: number;
+    toBlock: number;
+    sources: ContractSourceConfig[];
+  }): Promise<Log[]> {
+    const chunks: ContractSourceConfig[][] = [];
+    for (let i = 0; i < sources.length; i += 20) {
+      chunks.push(sources.slice(i, i + 20));
+    }
+
+    let events: Log[] = [];
+    for (const chunk of chunks) {
+      const address = chunk.map(source => source.contract);
+      const topics = chunk.flatMap(source =>
+        source.events.map(event => this.getEventHash(event.name))
+      );
+
+      const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [
+        topics
+      ]);
+      events = events.concat(chunkEvents);
+    }
+
+    return events;
   }
 }
