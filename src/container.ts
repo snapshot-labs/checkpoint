@@ -239,13 +239,12 @@ export class Container implements Instance {
     if (this.preloadedBlocks.length > 0)
       return this.preloadedBlocks.shift() as number;
 
+    const providerRange = this.indexer.getProvider().getPreloadRange();
     let currentBlock = blockNum;
 
     while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(
-        currentBlock + this.preloadStep,
-        this.preloadEndBlock
-      );
+      const step = providerRange ?? this.preloadStep;
+      const endBlock = Math.min(currentBlock + step, this.preloadEndBlock);
       let checkpoints: CheckpointRecord[];
       try {
         this.log.info(
@@ -264,14 +263,16 @@ export class Container implements Instance {
         continue;
       }
 
-      const increase =
-        checkpoints.length > BLOCK_PRELOAD_TARGET
-          ? -BLOCK_PRELOAD_STEP
-          : +BLOCK_PRELOAD_STEP;
-      this.preloadStep = Math.max(
-        BLOCK_RELOAD_MIN_RANGE,
-        this.preloadStep + increase
-      );
+      if (!providerRange) {
+        const increase =
+          checkpoints.length > BLOCK_PRELOAD_TARGET
+            ? -BLOCK_PRELOAD_STEP
+            : +BLOCK_PRELOAD_STEP;
+        this.preloadStep = Math.max(
+          BLOCK_RELOAD_MIN_RANGE,
+          this.preloadStep + increase
+        );
+      }
 
       if (checkpoints.length > 0) {
         this.preloadedBlocks = [
