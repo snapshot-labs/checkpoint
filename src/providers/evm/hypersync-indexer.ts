@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
-import { HyperSyncEvmProvider } from './hyper-sync-provider';
+import { HyperSyncEvmProvider } from './hypersync-provider';
 import { Writer } from './types';
 
 export class HyperSyncEvmIndexer extends BaseIndexer {
