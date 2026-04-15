@@ -225,9 +225,10 @@ export class CheckpointsStore {
   public async setBlockHash(
     indexer: string,
     blockNumber: number,
-    hash: string
+    hash: string,
+    executor: Knex | Knex.Transaction = this.knex
   ): Promise<void> {
-    await this.knex.table(Table.Blocks).insert({
+    await executor.table(Table.Blocks).insert({
       [Fields.Blocks.Indexer]: indexer,
       [Fields.Blocks.Number]: blockNumber,
       [Fields.Blocks.Hash]: hash
@@ -259,9 +260,10 @@ export class CheckpointsStore {
   public async setMetadata(
     indexer: string,
     id: string,
-    value: ToString
+    value: ToString,
+    executor: Knex | Knex.Transaction = this.knex
   ): Promise<void> {
-    await this.knex
+    await executor
       .table(Table.Metadata)
       .insert({
         [Fields.Metadata.Id]: id,
@@ -303,11 +305,14 @@ export class CheckpointsStore {
 
   public async insertCheckpoints(
     indexer: string,
-    checkpoints: CheckpointRecord[]
+    checkpoints: CheckpointRecord[],
+    executor: Knex | Knex.Transaction = this.knex
   ): Promise<void> {
+    if (checkpoints.length === 0) return;
+
     const insert = async (items: CheckpointRecord[]) => {
       try {
-        await this.knex
+        await executor
           .table(Table.Checkpoints)
           .insert(
             items.map(checkpoint => {
@@ -329,7 +334,7 @@ export class CheckpointsStore {
       } catch (err: any) {
         if (['ER_LOCK_DEADLOCK', '40P01'].includes(err.code)) {
           this.log.debug('deadlock detected, retrying...');
-          return this.insertCheckpoints(indexer, items);
+          return this.insertCheckpoints(indexer, items, executor);
         }
 
         throw err;

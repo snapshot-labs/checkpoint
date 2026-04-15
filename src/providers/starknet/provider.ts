@@ -108,11 +108,8 @@ export class StarknetProvider extends BaseProvider {
 
     await this.handleBlock(blockNum, block, eventsData);
 
-    if (block && isFullBlock(block)) {
-      await this.instance.setBlockHash(blockNum, block.block_hash);
-    }
-
-    await this.instance.setLastIndexedBlock(blockNum);
+    const blockHash = block && isFullBlock(block) ? block.block_hash : null;
+    await this.instance.flushBlock(blockNum, blockHash);
 
     return blockNum + 1;
   }

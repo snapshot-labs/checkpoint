@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
 import { GqlEntityController } from './graphql/controller';
+import { EntityWriteBuffer } from './orm/buffer';
 import {
   BaseIndexer,
   BlockNotFoundError,
@@ -47,6 +48,7 @@ export class Container implements Instance {
   private readonly indexer: BaseIndexer;
   private readonly entityController: GqlEntityController;
   private knex: Knex;
+  private buffer: EntityWriteBuffer;
 
   private activeTemplates: TemplateSource[] = [];
   private cpBlocksCache: number[] | null = [];
@@ -76,6 +78,8 @@ export class Container implements Instance {
     this.indexer = indexer;
     this.schema = schema;
     this.opts = opts;
+    this.buffer = new EntityWriteBuffer(indexerName, knex, store);
+    register.setBuffer(indexerName, this.buffer);
 
     this.indexer.init({
       instance: this,
@@ -183,22 +187,20 @@ export class Container implements Instance {
     };
   }
 
-  public async setBlockHash(blockNum: number, hash: string) {
-    this.blockHashCache = { blockNumber: blockNum, hash };
-
-    return this.store.setBlockHash(this.indexerName, blockNum, hash);
+  public insertCheckpoints(checkpoints: CheckpointRecord[]) {
+    this.buffer.pushCheckpoints(checkpoints);
   }
 
-  public async setLastIndexedBlock(block: number) {
-    await this.store.setMetadata(
-      this.indexerName,
-      MetadataId.LastIndexedBlock,
-      block
-    );
+  public async flushBlock(blockNumber: number, blockHash: string | null) {
+    if (blockHash !== null) {
+      this.blockHashCache = { blockNumber, hash: blockHash };
+    }
+
+    await this.buffer.flush({ blockNumber, blockHash });
   }
 
-  public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
-    await this.store.insertCheckpoints(this.indexerName, checkpoints);
+  public clearBuffer() {
+    this.buffer.clear();
   }
 
   /**
@@ -340,6 +342,7 @@ export class Container implements Instance {
 
       try {
         register.setCurrentBlock(this.indexerName, BigInt(blockNumber));
+        this.buffer.clear();
 
         const initialSources = this.getCurrentSources(blockNumber);
         const parentHash = await this.getBlockHash(blockNumber - 1);
@@ -354,6 +357,8 @@ export class Container implements Instance {
 
         blockNumber = nextBlockNumber;
       } catch (err) {
+        this.buffer.clear();
+
         if (err instanceof BlockNotFoundError) {
           if (this.config.optimistic_indexing) {
             try {

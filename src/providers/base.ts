@@ -10,8 +10,8 @@ export type Instance = {
   config: CheckpointConfig;
   opts?: CheckpointOptions;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
-  setBlockHash(blockNum: number, hash: string);
-  setLastIndexedBlock(blockNum: number);
+  flushBlock(blockNumber: number, blockHash: string | null): Promise<void>;
+  clearBuffer(): void;
   insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterHelpers(): {
     executeTemplate(
