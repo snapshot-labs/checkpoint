@@ -14,6 +14,7 @@ type EntityState = {
   hydrated: boolean;
   dirty: Row | null;
   deleted: boolean;
+  firstChangeBlock: number | null;
 };
 
 const UPDATE_CHUNK_SIZE = 1000;
@@ -26,6 +27,7 @@ export class EntityWriteBuffer {
 
   private cache = new Map<string, Map<string, EntityState>>();
   private checkpoints: CheckpointRecord[] = [];
+  private blockHashes = new Map<number, string>();
 
   constructor(indexerName: string, knex: Knex, store: CheckpointsStore) {
     this.indexerName = indexerName;
@@ -73,13 +75,19 @@ export class EntityWriteBuffer {
       loaded,
       hydrated: true,
       dirty: null,
-      deleted: false
+      deleted: false,
+      firstChangeBlock: null
     });
 
     return loaded;
   }
 
-  stageInsert(tableName: string, id: string | number, row: Row) {
+  stageInsert(
+    tableName: string,
+    id: string | number,
+    row: Row,
+    blockNumber: number
+  ) {
     const table = this.getTableMap(tableName);
     const key = this.key(id);
     const existing = table.get(key);
@@ -87,6 +95,9 @@ export class EntityWriteBuffer {
     if (existing) {
       existing.dirty = row;
       existing.deleted = false;
+      if (existing.firstChangeBlock === null) {
+        existing.firstChangeBlock = blockNumber;
+      }
       return;
     }
 
@@ -94,11 +105,17 @@ export class EntityWriteBuffer {
       loaded: null,
       hydrated: true,
       dirty: row,
-      deleted: false
+      deleted: false,
+      firstChangeBlock: blockNumber
     });
   }
 
-  stageUpdate(tableName: string, id: string | number, row: Row) {
+  stageUpdate(
+    tableName: string,
+    id: string | number,
+    row: Row,
+    blockNumber: number
+  ) {
     const table = this.getTableMap(tableName);
     const key = this.key(id);
     const existing = table.get(key);
@@ -106,29 +123,34 @@ export class EntityWriteBuffer {
     if (existing) {
       existing.dirty = row;
       existing.deleted = false;
+      if (existing.firstChangeBlock === null) {
+        existing.firstChangeBlock = blockNumber;
+      }
       return;
     }
 
-    // Save called on a model that was never loaded via the buffer —
-    // treat as insert of a pre-existing row. Flush still needs to close
-    // the previous range, so mark it as hydrated with unknown loaded state
-    // by forcing a DB lookup at flush time is expensive; instead we trust
-    // the caller's `exists` flag and emit both the range-close and insert.
+    // Save called on a model marked `exists` but never loaded via the buffer.
+    // Force a DB close-range UPDATE alongside the INSERT; if the row doesn't
+    // actually exist the UPDATE is a no-op.
     table.set(key, {
       loaded: { id } as Row,
       hydrated: true,
       dirty: row,
-      deleted: false
+      deleted: false,
+      firstChangeBlock: blockNumber
     });
   }
 
-  stageDelete(tableName: string, id: string | number) {
+  stageDelete(tableName: string, id: string | number, blockNumber: number) {
     const table = this.getTableMap(tableName);
     const key = this.key(id);
     const existing = table.get(key);
 
     if (existing) {
       existing.deleted = true;
+      if (existing.firstChangeBlock === null) {
+        existing.firstChangeBlock = blockNumber;
+      }
       return;
     }
 
@@ -136,13 +158,22 @@ export class EntityWriteBuffer {
       loaded: { id } as Row,
       hydrated: true,
       dirty: null,
-      deleted: true
+      deleted: true,
+      firstChangeBlock: blockNumber
     });
   }
 
   pushCheckpoints(records: CheckpointRecord[]) {
     if (records.length === 0) return;
     this.checkpoints.push(...records);
+  }
+
+  pushBlockHash(blockNumber: number, hash: string) {
+    this.blockHashes.set(blockNumber, hash);
+  }
+
+  getPendingBlockHash(blockNumber: number): string | null {
+    return this.blockHashes.get(blockNumber) ?? null;
   }
 
   async prefetch(targets: PreloadTarget[]): Promise<void> {
@@ -183,7 +214,8 @@ export class EntityWriteBuffer {
             loaded: row,
             hydrated: true,
             dirty: null,
-            deleted: false
+            deleted: false,
+            firstChangeBlock: null
           });
         }
 
@@ -194,7 +226,8 @@ export class EntityWriteBuffer {
             loaded: null,
             hydrated: true,
             dirty: null,
-            deleted: false
+            deleted: false,
+            firstChangeBlock: null
           });
         }
       })
@@ -203,6 +236,7 @@ export class EntityWriteBuffer {
 
   isEmpty(): boolean {
     if (this.checkpoints.length > 0) return false;
+    if (this.blockHashes.size > 0) return false;
     for (const table of this.cache.values()) {
       for (const state of table.values()) {
         if (state.dirty !== null || state.deleted) return false;
@@ -214,29 +248,32 @@ export class EntityWriteBuffer {
   clear() {
     this.cache.clear();
     this.checkpoints = [];
+    this.blockHashes.clear();
   }
 
-  async flush({
-    blockNumber,
-    blockHash
-  }: {
-    blockNumber: number;
-    blockHash: string | null;
-  }): Promise<void> {
+  async flush(lastBlockNumber: number): Promise<void> {
     const indexer = this.indexerName;
     const knex = this.knex;
 
     await knex.transaction(async trx => {
       for (const [tableName, table] of this.cache.entries()) {
-        const idsToCloseRange: (string | number)[] = [];
+        const closeByBlock = new Map<number, (string | number)[]>();
         const rowsToInsert: Row[] = [];
 
-        for (const [, state] of table.entries()) {
+        for (const state of table.values()) {
+          if (state.firstChangeBlock === null) continue;
+
           const hasExistingRow = state.loaded !== null;
           const hasFinalRow = state.dirty !== null && !state.deleted;
+          const boundary = state.firstChangeBlock;
 
           if (hasExistingRow && (state.dirty !== null || state.deleted)) {
-            idsToCloseRange.push(state.loaded!.id);
+            let bucket = closeByBlock.get(boundary);
+            if (!bucket) {
+              bucket = [];
+              closeByBlock.set(boundary, bucket);
+            }
+            bucket.push(state.loaded!.id);
           }
 
           if (hasFinalRow) {
@@ -245,22 +282,24 @@ export class EntityWriteBuffer {
             rowsToInsert.push({
               ...values,
               _indexer: indexer,
-              block_range: knex.raw('int8range(?, NULL)', [blockNumber])
+              block_range: knex.raw('int8range(?, NULL)', [boundary])
             });
           }
         }
 
-        for (const idsChunk of chunk(idsToCloseRange, UPDATE_CHUNK_SIZE)) {
-          await trx
-            .table(tableName)
-            .whereIn('id', idsChunk)
-            .andWhere('_indexer', indexer)
-            .andWhereRaw('upper_inf(block_range)')
-            .update({
-              block_range: knex.raw('int8range(lower(block_range), ?)', [
-                blockNumber
-              ])
-            });
+        for (const [boundary, ids] of closeByBlock.entries()) {
+          for (const idsChunk of chunk(ids, UPDATE_CHUNK_SIZE)) {
+            await trx
+              .table(tableName)
+              .whereIn('id', idsChunk)
+              .andWhere('_indexer', indexer)
+              .andWhereRaw('upper_inf(block_range)')
+              .update({
+                block_range: knex.raw('int8range(lower(block_range), ?)', [
+                  boundary
+                ])
+              });
+          }
         }
 
         for (const rowsChunk of chunk(rowsToInsert, INSERT_CHUNK_SIZE)) {
@@ -272,14 +311,14 @@ export class EntityWriteBuffer {
         await this.store.insertCheckpoints(indexer, this.checkpoints, trx);
       }
 
-      if (blockHash !== null) {
-        await this.store.setBlockHash(indexer, blockNumber, blockHash, trx);
+      for (const [blockNumber, hash] of this.blockHashes.entries()) {
+        await this.store.setBlockHash(indexer, blockNumber, hash, trx);
       }
 
       await this.store.setMetadata(
         indexer,
         MetadataId.LastIndexedBlock,
-        blockNumber,
+        lastBlockNumber,
         trx
       );
     });

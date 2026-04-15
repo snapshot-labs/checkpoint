@@ -53,11 +53,13 @@ export class Container implements Instance {
 
   private activeTemplates: TemplateSource[] = [];
   private cpBlocksCache: number[] | null = [];
-  private blockHashCache: { blockNumber: number; hash: string } | null = null;
 
   private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
+
+  private blocksInBatch = 0;
+  private batchStartBlock: number | null = null;
 
   constructor(
     indexerName: string,
@@ -122,12 +124,8 @@ export class Container implements Instance {
   }
 
   private async getBlockHash(blockNumber: number): Promise<string | null> {
-    if (
-      this.blockHashCache &&
-      this.blockHashCache.blockNumber === blockNumber
-    ) {
-      return this.blockHashCache.hash;
-    }
+    const pending = this.buffer.getPendingBlockHash(blockNumber);
+    if (pending !== null) return pending;
 
     return this.store.getBlockHash(this.indexerName, blockNumber);
   }
@@ -198,14 +196,35 @@ export class Container implements Instance {
 
   public async flushBlock(blockNumber: number, blockHash: string | null) {
     if (blockHash !== null) {
-      this.blockHashCache = { blockNumber, hash: blockHash };
+      this.buffer.pushBlockHash(blockNumber, blockHash);
     }
 
-    await this.buffer.flush({ blockNumber, blockHash });
+    if (this.blocksInBatch === 0) {
+      this.batchStartBlock = blockNumber;
+    }
+    this.blocksInBatch += 1;
+
+    if (this.blocksInBatch >= this.getEffectiveBatchSize(blockNumber)) {
+      await this.buffer.flush(blockNumber);
+      this.blocksInBatch = 0;
+      this.batchStartBlock = null;
+    }
   }
 
-  public clearBuffer() {
+  public clearBuffer(): number | null {
+    const restart = this.batchStartBlock;
     this.buffer.clear();
+    this.blocksInBatch = 0;
+    this.batchStartBlock = null;
+    return restart;
+  }
+
+  private getEffectiveBatchSize(blockNumber: number): number {
+    const configured = this.config.batch_size ?? 1;
+    if (configured <= 1) return 1;
+    // Near tip, flush every block so reorgs and live queries stay correct.
+    if (blockNumber >= this.preloadEndBlock) return 1;
+    return configured;
   }
 
   /**
@@ -347,7 +366,6 @@ export class Container implements Instance {
 
       try {
         register.setCurrentBlock(this.indexerName, BigInt(blockNumber));
-        this.buffer.clear();
 
         const initialSources = this.getCurrentSources(blockNumber);
         const parentHash = await this.getBlockHash(blockNumber - 1);
@@ -362,7 +380,10 @@ export class Container implements Instance {
 
         blockNumber = nextBlockNumber;
       } catch (err) {
-        this.buffer.clear();
+        const restartBlock = this.clearBuffer();
+        if (restartBlock !== null && restartBlock < blockNumber) {
+          blockNumber = restartBlock;
+        }
 
         if (err instanceof BlockNotFoundError) {
           if (this.config.optimistic_indexing) {
@@ -403,7 +424,16 @@ export class Container implements Instance {
   private async handleReorg(blockNumber: number) {
     this.log.info({ blockNumber }, 'handling reorg');
 
-    let current = blockNumber - 1;
+    // Any in-flight batch state was discarded by the caller (process() catch),
+    // so start the walk-back from the last committed block — never from an
+    // uncommitted block that would have been dropped with the buffer.
+    const dbLastIndexedBlock =
+      (await this.store.getMetadataNumber(
+        this.indexerName,
+        MetadataId.LastIndexedBlock
+      )) ?? 0;
+
+    let current = Math.min(blockNumber - 1, dbLastIndexedBlock);
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
       try {
@@ -456,7 +486,6 @@ export class Container implements Instance {
     await this.store.removeFutureData(this.indexerName, lastGoodBlock);
 
     this.cpBlocksCache = null;
-    this.blockHashCache = null;
 
     this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
 

@@ -39,18 +39,20 @@ export default class Model {
     const values = Object.fromEntries(this.values.entries());
     const id = this.get('id');
     const buffer = register.getBuffer(this.indexerName);
+    const blockNumber = Number(register.getCurrentBlock(this.indexerName));
 
     if (this.exists) {
-      buffer.stageUpdate(this.tableName, id, values);
+      buffer.stageUpdate(this.tableName, id, values, blockNumber);
     } else {
-      buffer.stageInsert(this.tableName, id, values);
+      buffer.stageInsert(this.tableName, id, values, blockNumber);
     }
   }
 
   async delete() {
     if (!this.exists) return;
+    const blockNumber = Number(register.getCurrentBlock(this.indexerName));
     register
       .getBuffer(this.indexerName)
-      .stageDelete(this.tableName, this.get('id'));
+      .stageDelete(this.tableName, this.get('id'), blockNumber);
   }
 }
