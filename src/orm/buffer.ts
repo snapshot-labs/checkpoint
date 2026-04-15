@@ -4,6 +4,7 @@ import {
   CheckpointsStore,
   MetadataId
 } from '../stores/checkpoints';
+import { PreloadTarget } from '../types';
 import { chunk } from '../utils/helpers';
 
 type Row = Record<string, any>;
@@ -142,6 +143,62 @@ export class EntityWriteBuffer {
   pushCheckpoints(records: CheckpointRecord[]) {
     if (records.length === 0) return;
     this.checkpoints.push(...records);
+  }
+
+  async prefetch(targets: PreloadTarget[]): Promise<void> {
+    if (targets.length === 0) return;
+
+    const uncachedByTable = new Map<string, Set<string | number>>();
+    for (const target of targets) {
+      const table = this.getTableMap(target.table);
+      for (const id of target.ids) {
+        if (table.has(this.key(id))) continue;
+        let set = uncachedByTable.get(target.table);
+        if (!set) {
+          set = new Set();
+          uncachedByTable.set(target.table, set);
+        }
+        set.add(id);
+      }
+    }
+
+    if (uncachedByTable.size === 0) return;
+
+    await Promise.all(
+      [...uncachedByTable.entries()].map(async ([tableName, idSet]) => {
+        const ids = [...idSet];
+        const rows = await this.knex
+          .table(tableName)
+          .select('*')
+          .whereIn('id', ids)
+          .andWhere('_indexer', this.indexerName)
+          .andWhereRaw('upper_inf(block_range)');
+
+        const table = this.getTableMap(tableName);
+        const foundKeys = new Set<string>();
+        for (const row of rows) {
+          const key = this.key(row.id);
+          foundKeys.add(key);
+          table.set(key, {
+            loaded: row,
+            hydrated: true,
+            dirty: null,
+            deleted: false
+          });
+        }
+
+        for (const id of ids) {
+          const key = this.key(id);
+          if (foundKeys.has(key)) continue;
+          table.set(key, {
+            loaded: null,
+            hydrated: true,
+            dirty: null,
+            deleted: false
+          });
+        }
+      })
+    );
   }
 
   isEmpty(): boolean {

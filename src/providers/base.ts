@@ -2,7 +2,8 @@ import { CheckpointRecord } from '../stores/checkpoints';
 import {
   CheckpointConfig,
   CheckpointOptions,
-  ContractSourceConfig
+  ContractSourceConfig,
+  PreloadTarget
 } from '../types';
 import { Logger } from '../utils/logger';
 
@@ -13,6 +14,7 @@ export type Instance = {
   flushBlock(blockNumber: number, blockHash: string | null): Promise<void>;
   clearBuffer(): void;
   insertCheckpoints(checkpoints: CheckpointRecord[]);
+  prefetchEntities(targets: PreloadTarget[]): Promise<void>;
   getWriterHelpers(): {
     executeTemplate(
       template: string,
@@ -131,5 +133,9 @@ export class BaseIndexer {
 
   public getHandlers(): string[] {
     throw new Error('getHandlers method was not defined');
+  }
+
+  public getPreloaders(): string[] {
+    return [];
   }
 }

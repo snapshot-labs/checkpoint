@@ -12,9 +12,15 @@ import {
   stringToBytes
 } from 'viem';
 import { getRangeHint } from './helpers';
-import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
+import {
+  Block,
+  CustomJsonRpcError,
+  EventsData,
+  Preloader,
+  Writer
+} from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { ContractSourceConfig } from '../../types';
+import { ContractSourceConfig, PreloadTarget } from '../../types';
 import { sleep } from '../../utils/helpers';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 
@@ -39,6 +45,7 @@ export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
 
   private readonly writers: Record<string, Writer>;
+  private readonly preloaders: Record<string, Preloader>;
   private sourceHashes = new Map<string, string>();
   protected logsCache = new Map<bigint, Log[]>();
 
@@ -46,9 +53,11 @@ export class EvmProvider extends BaseProvider {
     instance,
     log,
     abis,
-    writers
+    writers,
+    preloaders
   }: ConstructorParameters<typeof BaseProvider>[0] & {
     writers: Record<string, Writer>;
+    preloaders?: Record<string, Preloader>;
   }) {
     super({ instance, log, abis });
 
@@ -59,6 +68,7 @@ export class EvmProvider extends BaseProvider {
     });
 
     this.writers = writers;
+    this.preloaders = preloaders ?? {};
   }
 
   formatAddresses(addresses: string[]): string[] {
@@ -143,6 +153,8 @@ export class EvmProvider extends BaseProvider {
 
     const blockTransactions = Object.keys(eventsData.events);
 
+    await this.runPreloadPhase(blockNumber, block, eventsData);
+
     for (const txId of blockTransactions) {
       await this.handleTx(
         block,
@@ -154,6 +166,69 @@ export class EvmProvider extends BaseProvider {
     }
 
     this.log.debug({ blockNumber }, 'handling block done');
+  }
+
+  private async runPreloadPhase(
+    blockNumber: number,
+    block: Block | null,
+    eventsData: EventsData
+  ) {
+    if (Object.keys(this.preloaders).length === 0) return;
+
+    const sources = this.instance.getCurrentSources(blockNumber);
+    const requests: Promise<PreloadTarget[]>[] = [];
+
+    for (const txId of Object.keys(eventsData.events)) {
+      const logs = eventsData.events[txId] || [];
+      for (const log of logs) {
+        for (const source of sources) {
+          if (!this.compareAddress(source.contract, log.address)) continue;
+
+          for (const sourceEvent of source.events) {
+            if (!sourceEvent.preload_fn) continue;
+            if (this.getEventHash(sourceEvent.name) !== log.topics[0]) continue;
+
+            const preloader = this.preloaders[sourceEvent.preload_fn];
+            if (!preloader) continue;
+
+            let parsedEvent: ParseEventLogsReturnType[number] | undefined;
+            if (source.abi && this.abis?.[source.abi]) {
+              try {
+                const parsedLogs = parseEventLogs({
+                  abi: this.abis[source.abi],
+                  logs: [log]
+                });
+                parsedEvent = parsedLogs[0] as ParseEventLogsReturnType[number];
+              } catch {
+                // parsing failures are reported by the writer path; the
+                // preloader just runs without the parsed payload.
+              }
+            }
+
+            requests.push(
+              Promise.resolve(
+                preloader({
+                  txId,
+                  block,
+                  blockNumber,
+                  rawEvent: log,
+                  event: parsedEvent,
+                  source
+                })
+              )
+            );
+          }
+        }
+      }
+    }
+
+    if (requests.length === 0) return;
+
+    const results = await Promise.all(requests);
+    const targets = results.flat();
+    if (targets.length === 0) return;
+
+    await this.instance.prefetchEntities(targets);
   }
 
   private async handleTx(

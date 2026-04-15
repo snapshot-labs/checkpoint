@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const contractEventConfigSchema = z.object({
   name: z.string(),
-  fn: z.string()
+  fn: z.string(),
+  preload_fn: z.string().optional()
 });
 
 export const contractSourceConfigSchema = z.object({

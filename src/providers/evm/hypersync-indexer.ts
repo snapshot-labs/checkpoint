@@ -1,13 +1,20 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
 import { HyperSyncEvmProvider } from './hypersync-provider';
-import { Writer } from './types';
+import { Preloader, Writer } from './types';
 
 export class HyperSyncEvmIndexer extends BaseIndexer {
   private writers: Record<string, Writer>;
-  private options: { apiToken: string };
+  private preloaders: Record<string, Preloader>;
+  private options: {
+    apiToken: string;
+    preloaders?: Record<string, Preloader>;
+  };
 
-  constructor(writers: Record<string, Writer>, options: { apiToken: string }) {
+  constructor(
+    writers: Record<string, Writer>,
+    options: { apiToken: string; preloaders?: Record<string, Preloader> }
+  ) {
     super();
 
     if (!options.apiToken) {
@@ -15,6 +22,7 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
     }
 
     this.writers = writers;
+    this.preloaders = options.preloaders ?? {};
     this.options = options;
   }
 
@@ -34,11 +42,16 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
       log,
       abis,
       writers: this.writers,
+      preloaders: this.preloaders,
       apiToken: this.options.apiToken
     });
   }
 
   public getHandlers(): string[] {
     return Object.keys(this.writers);
+  }
+
+  public getPreloaders(): string[] {
+    return Object.keys(this.preloaders);
   }
 }

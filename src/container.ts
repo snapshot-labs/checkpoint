@@ -17,6 +17,7 @@ import {
   CheckpointConfig,
   CheckpointOptions,
   ContractSourceConfig,
+  PreloadTarget,
   TemplateSource
 } from './types';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
@@ -189,6 +190,10 @@ export class Container implements Instance {
 
   public insertCheckpoints(checkpoints: CheckpointRecord[]) {
     this.buffer.pushCheckpoints(checkpoints);
+  }
+
+  public async prefetchEntities(targets: PreloadTarget[]) {
+    await this.buffer.prefetch(targets);
   }
 
   public async flushBlock(blockNumber: number, blockHash: string | null) {
@@ -539,14 +544,18 @@ export class Container implements Instance {
       ...sources.map(source => source.abi),
       ...templates.map(template => template.abi)
     ].filter(abi => abi) as string[];
-    const usedWriters = [
+    const usedEvents = [
       ...sources.flatMap(source => source.events),
       ...templates.flatMap(template => template.events)
     ];
 
     const missingAbis = usedAbis.filter(abi => !this.config.abis?.[abi]);
-    const missingWriters = usedWriters.filter(
-      writer => !this.indexer.getHandlers().includes(writer.fn)
+    const missingWriters = usedEvents.filter(
+      event => !this.indexer.getHandlers().includes(event.fn)
+    );
+    const knownPreloaders = this.indexer.getPreloaders();
+    const missingPreloaders = usedEvents.filter(
+      event => event.preload_fn && !knownPreloaders.includes(event.preload_fn)
     );
 
     if (missingAbis.length > 0) {
@@ -559,6 +568,14 @@ export class Container implements Instance {
       throw new Error(
         `Following writers are used (${missingWriters
           .map(writer => writer.fn)
+          .join(', ')}), but they are not defined`
+      );
+    }
+
+    if (missingPreloaders.length > 0) {
+      throw new Error(
+        `Following preloaders are used (${missingPreloaders
+          .map(event => event.preload_fn)
           .join(', ')}), but they are not defined`
       );
     }

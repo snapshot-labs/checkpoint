@@ -8,11 +8,12 @@ import {
   FullBlock,
   isFullBlock,
   ParsedEvent,
+  Preloader,
   Writer
 } from './types';
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { ContractSourceConfig } from '../../types';
+import { ContractSourceConfig, PreloadTarget } from '../../types';
 import { sleep } from '../../utils/helpers';
 
 class CustomJsonRpcError extends Error {
@@ -28,6 +29,7 @@ class CustomJsonRpcError extends Error {
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
   private readonly writers: Record<string, Writer>;
+  private readonly preloaders: Record<string, Preloader>;
   private seenPoolTransactions = new Set();
   private processedTransactions = new Set();
   private sourceHashes = new Map<string, string>();
@@ -37,9 +39,11 @@ export class StarknetProvider extends BaseProvider {
     instance,
     log,
     abis,
-    writers
+    writers,
+    preloaders
   }: ConstructorParameters<typeof BaseProvider>[0] & {
     writers: Record<string, Writer>;
+    preloaders?: Record<string, Preloader>;
   }) {
     super({ instance, log, abis });
 
@@ -47,6 +51,7 @@ export class StarknetProvider extends BaseProvider {
       nodeUrl: this.instance.config.network_node_url
     });
     this.writers = writers;
+    this.preloaders = preloaders ?? {};
   }
 
   formatAddresses(addresses: string[]): string[] {
@@ -149,6 +154,8 @@ export class StarknetProvider extends BaseProvider {
       txId => !this.seenPoolTransactions.has(txId)
     );
 
+    await this.runPreloadPhase(blockNumber, block, eventsData, txsToCheck);
+
     for (const txId of txsToCheck) {
       await this.handleTx(
         block,
@@ -162,6 +169,67 @@ export class StarknetProvider extends BaseProvider {
     this.seenPoolTransactions.clear();
 
     this.log.debug({ blockNumber }, 'handling block done');
+  }
+
+  private async runPreloadPhase(
+    blockNumber: number,
+    block: FullBlock | null,
+    eventsData: EventsData,
+    txIds: string[]
+  ) {
+    if (Object.keys(this.preloaders).length === 0) return;
+
+    const sources = this.instance.getCurrentSources(blockNumber);
+    const requests: Promise<PreloadTarget[]>[] = [];
+
+    for (const txId of txIds) {
+      const events = eventsData.events[txId] || [];
+      for (const event of events) {
+        for (const source of sources) {
+          const contract = validateAndParseAddress(source.contract);
+          if (contract !== validateAndParseAddress(event.from_address))
+            continue;
+
+          for (const sourceEvent of source.events) {
+            if (!sourceEvent.preload_fn) continue;
+            if (this.getEventHash(sourceEvent.name) !== event.keys[0]) continue;
+
+            const preloader = this.preloaders[sourceEvent.preload_fn];
+            if (!preloader) continue;
+
+            let parsedEvent: ParsedEvent | undefined;
+            if (source.abi && this.abis?.[source.abi]) {
+              try {
+                parsedEvent = parseEvent(this.abis[source.abi], event);
+              } catch {
+                // parsing failures are reported by the writer path.
+              }
+            }
+
+            requests.push(
+              Promise.resolve(
+                preloader({
+                  txId,
+                  block,
+                  blockNumber,
+                  rawEvent: event,
+                  event: parsedEvent,
+                  source
+                })
+              )
+            );
+          }
+        }
+      }
+    }
+
+    if (requests.length === 0) return;
+
+    const results = await Promise.all(requests);
+    const targets = results.flat();
+    if (targets.length === 0) return;
+
+    await this.instance.prefetchEntities(targets);
   }
 
   private async handlePool(

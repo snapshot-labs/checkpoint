@@ -1,5 +1,9 @@
 import { RPC } from 'starknet';
-import { BaseWriterParams } from '../../types';
+import {
+  BasePreloaderParams,
+  BaseWriterParams,
+  PreloadTarget
+} from '../../types';
 
 // Shortcuts to starknet types.
 export type Block = RPC.GetBlockWithTxHashesResponse;
@@ -29,6 +33,15 @@ export type Writer = (
     event?: ParsedEvent;
   } & BaseWriterParams
 ) => Promise<void>;
+
+export type Preloader = (
+  args: {
+    txId: string;
+    block: FullBlock | null;
+    rawEvent: Event;
+    event?: ParsedEvent;
+  } & BasePreloaderParams
+) => PreloadTarget[] | Promise<PreloadTarget[]>;
 
 export function isFullBlock(block: Block): block is FullBlock {
   return 'block_number' in block;
