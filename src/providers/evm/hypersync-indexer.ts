@@ -9,11 +9,16 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
   private options: {
     apiToken: string;
     preloaders?: Record<string, Preloader>;
+    preloadRange?: number;
   };
 
   constructor(
     writers: Record<string, Writer>,
-    options: { apiToken: string; preloaders?: Record<string, Preloader> }
+    options: {
+      apiToken: string;
+      preloaders?: Record<string, Preloader>;
+      preloadRange?: number;
+    }
   ) {
     super();
 
@@ -43,7 +48,8 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
       abis,
       writers: this.writers,
       preloaders: this.preloaders,
-      apiToken: this.options.apiToken
+      apiToken: this.options.apiToken,
+      preloadRange: this.options.preloadRange
     });
   }
 

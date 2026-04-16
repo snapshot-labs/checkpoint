@@ -59,22 +59,27 @@ const FIELD_SELECTION = {
   ]
 };
 
+const DEFAULT_PRELOAD_RANGE = 1_000_000;
+
 export class HyperSyncEvmProvider extends EvmProvider {
   private readonly apiToken: string;
+  private readonly preloadRange: number;
   private hyperSyncUrl?: string;
   private blockCache = new Map<number, FetchedBlock>();
 
   constructor(
     params: ConstructorParameters<typeof EvmProvider>[0] & {
       apiToken: string;
+      preloadRange?: number;
     }
   ) {
     super(params);
     this.apiToken = params.apiToken;
+    this.preloadRange = params.preloadRange ?? DEFAULT_PRELOAD_RANGE;
   }
 
   getPreloadRange(): number {
-    return Infinity;
+    return this.preloadRange;
   }
 
   async getCheckpointsRange(
