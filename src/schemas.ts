@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const contractEventConfigSchema = z.object({
   name: z.string(),
-  fn: z.string()
+  fn: z.string(),
+  preload_fn: z.string().optional()
 });
 
 export const contractSourceConfigSchema = z.object({
@@ -22,6 +23,7 @@ export const checkpointConfigSchema = z.object({
   optimistic_indexing: z.boolean().optional(),
   fetch_interval: z.number().optional(),
   start: z.number().gte(0).optional(),
+  batch_size: z.number().int().gte(1).optional(),
   tx_fn: z.string().optional(),
   global_events: z.array(contractEventConfigSchema).optional(),
   sources: z.array(contractSourceConfigSchema).optional(),

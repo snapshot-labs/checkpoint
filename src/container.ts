@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
 import { GqlEntityController } from './graphql/controller';
+import { EntityWriteBuffer } from './orm/buffer';
 import {
   BaseIndexer,
   BlockNotFoundError,
@@ -16,6 +17,7 @@ import {
   CheckpointConfig,
   CheckpointOptions,
   ContractSourceConfig,
+  PreloadTarget,
   TemplateSource
 } from './types';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
@@ -35,6 +37,10 @@ const CHECK_LATEST_BLOCK_INTERVAL = 50;
 
 const DEFAULT_FETCH_INTERVAL = 2000;
 
+const DEFAULT_BATCH_SIZE = 100;
+
+const REORG_MAX_WALK_BACK = 128;
+
 export class Container implements Instance {
   private indexerName: string;
 
@@ -47,14 +53,17 @@ export class Container implements Instance {
   private readonly indexer: BaseIndexer;
   private readonly entityController: GqlEntityController;
   private knex: Knex;
+  private buffer: EntityWriteBuffer;
 
   private activeTemplates: TemplateSource[] = [];
   private cpBlocksCache: number[] | null = [];
-  private blockHashCache: { blockNumber: number; hash: string } | null = null;
 
   private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
+
+  private blocksInBatch = 0;
+  private batchStartBlock: number | null = null;
 
   constructor(
     indexerName: string,
@@ -76,6 +85,8 @@ export class Container implements Instance {
     this.indexer = indexer;
     this.schema = schema;
     this.opts = opts;
+    this.buffer = new EntityWriteBuffer(indexerName, knex, store);
+    register.setBuffer(indexerName, this.buffer);
 
     this.indexer.init({
       instance: this,
@@ -117,12 +128,8 @@ export class Container implements Instance {
   }
 
   private async getBlockHash(blockNumber: number): Promise<string | null> {
-    if (
-      this.blockHashCache &&
-      this.blockHashCache.blockNumber === blockNumber
-    ) {
-      return this.blockHashCache.hash;
-    }
+    const pending = this.buffer.getPendingBlockHash(blockNumber);
+    if (pending !== null) return pending;
 
     return this.store.getBlockHash(this.indexerName, blockNumber);
   }
@@ -183,22 +190,45 @@ export class Container implements Instance {
     };
   }
 
-  public async setBlockHash(blockNum: number, hash: string) {
-    this.blockHashCache = { blockNumber: blockNum, hash };
-
-    return this.store.setBlockHash(this.indexerName, blockNum, hash);
+  public insertCheckpoints(checkpoints: CheckpointRecord[]) {
+    this.buffer.pushCheckpoints(checkpoints);
   }
 
-  public async setLastIndexedBlock(block: number) {
-    await this.store.setMetadata(
-      this.indexerName,
-      MetadataId.LastIndexedBlock,
-      block
-    );
+  public async prefetchEntities(targets: PreloadTarget[]) {
+    await this.buffer.prefetch(targets);
   }
 
-  public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
-    await this.store.insertCheckpoints(this.indexerName, checkpoints);
+  public async flushBlock(blockNumber: number, blockHash: string | null) {
+    if (blockHash !== null) {
+      this.buffer.pushBlockHash(blockNumber, blockHash);
+    }
+
+    if (this.blocksInBatch === 0) {
+      this.batchStartBlock = blockNumber;
+    }
+    this.blocksInBatch += 1;
+
+    if (this.blocksInBatch >= this.getEffectiveBatchSize(blockNumber)) {
+      await this.buffer.flush(blockNumber);
+      this.blocksInBatch = 0;
+      this.batchStartBlock = null;
+    }
+  }
+
+  public clearBuffer(): number | null {
+    const restart = this.batchStartBlock;
+    this.buffer.clear();
+    this.blocksInBatch = 0;
+    this.batchStartBlock = null;
+    return restart;
+  }
+
+  private getEffectiveBatchSize(blockNumber: number): number {
+    const configured = this.config.batch_size ?? DEFAULT_BATCH_SIZE;
+    if (configured <= 1) return 1;
+    // Near tip, flush every block so reorgs and live queries stay correct.
+    if (blockNumber >= this.preloadEndBlock) return 1;
+    return configured;
   }
 
   /**
@@ -354,6 +384,11 @@ export class Container implements Instance {
 
         blockNumber = nextBlockNumber;
       } catch (err) {
+        const restartBlock = this.clearBuffer();
+        if (restartBlock !== null && restartBlock < blockNumber) {
+          blockNumber = restartBlock;
+        }
+
         if (err instanceof BlockNotFoundError) {
           if (this.config.optimistic_indexing) {
             try {
@@ -393,9 +428,24 @@ export class Container implements Instance {
   private async handleReorg(blockNumber: number) {
     this.log.info({ blockNumber }, 'handling reorg');
 
-    let current = blockNumber - 1;
+    // Any in-flight batch state was discarded by the caller (process() catch),
+    // so start the walk-back from the last committed block — never from an
+    // uncommitted block that would have been dropped with the buffer.
+    const dbLastIndexedBlock =
+      (await this.store.getMetadataNumber(
+        this.indexerName,
+        MetadataId.LastIndexedBlock
+      )) ?? 0;
+
+    const walkStart = Math.min(blockNumber - 1, dbLastIndexedBlock);
+    let current = walkStart;
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
+      if (walkStart - current >= REORG_MAX_WALK_BACK) {
+        throw new Error(
+          `reorg walk-back exceeded ${REORG_MAX_WALK_BACK} blocks (started at ${walkStart}, now at ${current})`
+        );
+      }
       try {
         const storedBlockHash = await this.store.getBlockHash(
           this.indexerName,
@@ -446,7 +496,6 @@ export class Container implements Instance {
     await this.store.removeFutureData(this.indexerName, lastGoodBlock);
 
     this.cpBlocksCache = null;
-    this.blockHashCache = null;
 
     this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
 
@@ -534,14 +583,18 @@ export class Container implements Instance {
       ...sources.map(source => source.abi),
       ...templates.map(template => template.abi)
     ].filter(abi => abi) as string[];
-    const usedWriters = [
+    const usedEvents = [
       ...sources.flatMap(source => source.events),
       ...templates.flatMap(template => template.events)
     ];
 
     const missingAbis = usedAbis.filter(abi => !this.config.abis?.[abi]);
-    const missingWriters = usedWriters.filter(
-      writer => !this.indexer.getHandlers().includes(writer.fn)
+    const missingWriters = usedEvents.filter(
+      event => !this.indexer.getHandlers().includes(event.fn)
+    );
+    const knownPreloaders = this.indexer.getPreloaders();
+    const missingPreloaders = usedEvents.filter(
+      event => event.preload_fn && !knownPreloaders.includes(event.preload_fn)
     );
 
     if (missingAbis.length > 0) {
@@ -554,6 +607,14 @@ export class Container implements Instance {
       throw new Error(
         `Following writers are used (${missingWriters
           .map(writer => writer.fn)
+          .join(', ')}), but they are not defined`
+      );
+    }
+
+    if (missingPreloaders.length > 0) {
+      throw new Error(
+        `Following preloaders are used (${missingPreloaders
+          .map(event => event.preload_fn)
           .join(', ')}), but they are not defined`
       );
     }

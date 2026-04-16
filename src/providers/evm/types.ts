@@ -5,7 +5,11 @@ import {
   Log,
   ParseEventLogsReturnType
 } from 'viem';
-import { BaseWriterParams } from '../../types';
+import {
+  BasePreloaderParams,
+  BaseWriterParams,
+  PreloadTarget
+} from '../../types';
 
 export class CustomJsonRpcError extends Error {
   constructor(
@@ -40,3 +44,15 @@ export type Writer<
     event?: ParseEventLogsReturnType<WriterAbi, EventName, true>[number];
   } & BaseWriterParams
 ) => Promise<void>;
+
+export type Preloader<
+  PreloaderAbi extends Abi = any,
+  EventName extends ContractEventName<PreloaderAbi> = any
+> = (
+  args: {
+    txId: string;
+    block: Block | null;
+    rawEvent: Log;
+    event?: ParseEventLogsReturnType<PreloaderAbi, EventName, true>[number];
+  } & BasePreloaderParams
+) => PreloadTarget[] | Promise<PreloadTarget[]>;

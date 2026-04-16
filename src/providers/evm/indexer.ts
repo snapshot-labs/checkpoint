@@ -1,14 +1,19 @@
 import { Logger } from '../../utils/logger';
 import { BaseIndexer, Instance } from '../base';
 import { EvmProvider } from './provider';
-import { Writer } from './types';
+import { Preloader, Writer } from './types';
 
 export class EvmIndexer extends BaseIndexer {
   private writers: Record<string, Writer>;
+  private preloaders: Record<string, Preloader>;
 
-  constructor(writers: Record<string, Writer>) {
+  constructor(
+    writers: Record<string, Writer>,
+    preloaders: Record<string, Preloader> = {}
+  ) {
     super();
     this.writers = writers;
+    this.preloaders = preloaders;
   }
 
   init({
@@ -24,11 +29,16 @@ export class EvmIndexer extends BaseIndexer {
       instance,
       log,
       abis,
-      writers: this.writers
+      writers: this.writers,
+      preloaders: this.preloaders
     });
   }
 
   public getHandlers(): string[] {
     return Object.keys(this.writers);
+  }
+
+  public getPreloaders(): string[] {
+    return Object.keys(this.preloaders);
   }
 }

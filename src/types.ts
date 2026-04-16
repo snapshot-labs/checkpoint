@@ -54,3 +54,13 @@ export type BaseWriterParams = {
   source?: ContractSourceConfig;
   helpers: ReturnType<Instance['getWriterHelpers']>;
 };
+
+export type PreloadTarget = {
+  table: string;
+  ids: (string | number)[];
+};
+
+export type BasePreloaderParams = {
+  blockNumber: number;
+  source: ContractSourceConfig;
+};
