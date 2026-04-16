@@ -123,7 +123,7 @@ export const codegen = (
 ) => {
   const decimalTypes = config.decimal_types || DEFAULT_DECIMAL_TYPES;
 
-  const preamble = `import { Model } from '@snapshot-labs/checkpoint';\n\n`;
+  const preamble = `import { Model } from 'checkpoint-playground';\n\n`;
 
   let contents = `${preamble}`;
 

@@ -37,7 +37,9 @@ const CHECK_LATEST_BLOCK_INTERVAL = 50;
 
 const DEFAULT_FETCH_INTERVAL = 2000;
 
-const DEFAULT_BATCH_SIZE = 10000;
+const DEFAULT_BATCH_SIZE = 100;
+
+const REORG_MAX_WALK_BACK = 128;
 
 export class Container implements Instance {
   private indexerName: string;
@@ -435,9 +437,15 @@ export class Container implements Instance {
         MetadataId.LastIndexedBlock
       )) ?? 0;
 
-    let current = Math.min(blockNumber - 1, dbLastIndexedBlock);
+    const walkStart = Math.min(blockNumber - 1, dbLastIndexedBlock);
+    let current = walkStart;
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
+      if (walkStart - current >= REORG_MAX_WALK_BACK) {
+        throw new Error(
+          `reorg walk-back exceeded ${REORG_MAX_WALK_BACK} blocks (started at ${walkStart}, now at ${current})`
+        );
+      }
       try {
         const storedBlockHash = await this.store.getBlockHash(
           this.indexerName,
