@@ -41,6 +41,8 @@ type HyperSyncResponse = {
   }[];
 };
 
+const PRELOAD_RANGE = 1000000;
+
 const FIELD_SELECTION = {
   block: ['number', 'timestamp', 'hash', 'parent_hash'],
   log: [
@@ -74,7 +76,7 @@ export class HyperSyncEvmProvider extends EvmProvider {
   }
 
   getPreloadRange(): number {
-    return Infinity;
+    return PRELOAD_RANGE;
   }
 
   async getCheckpointsRange(
