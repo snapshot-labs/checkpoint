@@ -26,7 +26,8 @@ export const checkpointConfigSchema = z.object({
   global_events: z.array(contractEventConfigSchema).optional(),
   sources: z.array(contractSourceConfigSchema).optional(),
   templates: z.record(contractTemplateSchema).optional(),
-  abis: z.record(z.any()).optional()
+  abis: z.record(z.any()).optional(),
+  state_retention_blocks: z.number().int().positive().optional()
 });
 
 export const overridesConfigSchema = z.object({

@@ -56,6 +56,8 @@ export class Container implements Instance {
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
 
+  private lastPurgeBlock: number | null = null;
+
   constructor(
     indexerName: string,
     log: Logger,
@@ -353,6 +355,18 @@ export class Container implements Instance {
         }
 
         blockNumber = nextBlockNumber;
+
+        if (this.config.state_retention_blocks) {
+          if (this.lastPurgeBlock === null) {
+            this.lastPurgeBlock = blockNumber;
+          } else if (
+            blockNumber - this.lastPurgeBlock >=
+            this.config.state_retention_blocks
+          ) {
+            await this.purgeOldState(blockNumber);
+            this.lastPurgeBlock = blockNumber;
+          }
+        }
       } catch (err) {
         if (err instanceof BlockNotFoundError) {
           if (this.config.optimistic_indexing) {
@@ -387,6 +401,28 @@ export class Container implements Instance {
 
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
       }
+    }
+  }
+
+  private async purgeOldState(currentBlock: number) {
+    const retention = this.config.state_retention_blocks as number;
+    const cutoff = currentBlock - retention;
+    if (cutoff <= 0) return;
+
+    const tables = this.entityController.schemaObjects.map(entity =>
+      getTableName(entity.name.toLowerCase())
+    );
+
+    this.log.info({ cutoff, currentBlock }, 'purging old state');
+
+    for (const tableName of tables) {
+      const deleted = await this.knex
+        .table(tableName)
+        .where('_indexer', this.indexerName)
+        .andWhereRaw('upper(block_range) <= ?', [cutoff])
+        .delete();
+
+      this.log.debug({ table: tableName, deleted }, 'purged rows');
     }
   }
 
