@@ -273,6 +273,15 @@ export class GqlEntityController {
             )
             .toQuery()
         );
+
+        builder = builder.raw(
+          knex
+            .raw(
+              'CREATE INDEX ON ?? (id, _indexer) WHERE upper_inf(block_range)',
+              [tableName]
+            )
+            .toQuery()
+        );
       }
     });
 
