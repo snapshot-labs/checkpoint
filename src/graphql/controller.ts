@@ -26,10 +26,11 @@ import { Knex } from 'knex';
 import pluralize from 'pluralize';
 import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
 import { KnexType } from '../knex';
-import { OverridesConfig } from '../types';
+import { ComputedResolvers, OverridesConfig } from '../types';
 import { getNestedResolver, queryMulti, querySingle } from './resolvers';
 import {
   generateQueryForEntity,
+  getComputedDirective,
   getDerivedFromDirective,
   getNonNullType,
   multiEntityQueryName,
@@ -70,9 +71,14 @@ type WhereResult = {
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
   private readonly decimalTypes: NonNullable<OverridesConfig['decimal_types']>;
+  private readonly computedResolvers: ComputedResolvers;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source, config?: OverridesConfig) {
+  constructor(
+    typeDefs: string | Source,
+    config?: OverridesConfig,
+    computedResolvers?: ComputedResolvers
+  ) {
     this.schema = buildSchema(typeDefs);
     this.decimalTypes = config?.decimal_types || {
       Decimal: {
@@ -84,6 +90,7 @@ export class GqlEntityController {
         d: 8
       }
     };
+    this.computedResolvers = computedResolvers || {};
   }
 
   /**
@@ -236,6 +243,8 @@ export class GqlEntityController {
           t.specificType('block_range', 'int8range').notNullable();
 
           this.getTypeFields(type).forEach(field => {
+            if (getComputedDirective(field)) return;
+
             const fieldType =
               field.type instanceof GraphQLNonNull
                 ? field.type.ofType
@@ -381,6 +390,8 @@ export class GqlEntityController {
       };
 
       this.getTypeFields(nestedType).forEach(field => {
+        if (getComputedDirective(field)) return;
+
         // all field types in a where input variable must be optional
         // so we try to extract the non null type here.
         let nonNullFieldType = getNonNullType(field.type);
@@ -639,9 +650,23 @@ export class GqlEntityController {
     const schema = new GraphQLSchema({ query });
 
     if (opts?.addResolvers) {
+      const entityResolvers = this.generateEntityResolvers(entityQueryFields);
+
+      for (const [typeName, fields] of Object.entries(this.computedResolvers)) {
+        if (!entityResolvers[typeName]) entityResolvers[typeName] = {};
+
+        for (const [fieldName, resolver] of Object.entries(fields)) {
+          entityResolvers[typeName][fieldName] = (
+            parent: Record<string, any>,
+            args: Record<string, any>,
+            context: any
+          ) => resolver(parent, args, context);
+        }
+      }
+
       return addResolversToSchema({
         schema,
-        resolvers: this.generateEntityResolvers(entityQueryFields)
+        resolvers: entityResolvers
       });
     }
 

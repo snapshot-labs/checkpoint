@@ -17,7 +17,7 @@ export const extendSchema = (schema: string): string => {
 
   const updatedAst = visit(ast, {
     Document(node) {
-      const directiveDefinition = {
+      const derivedFromDirective = {
         kind: 'DirectiveDefinition',
         name: { kind: 'Name', value: 'derivedFrom' },
         arguments: [
@@ -36,9 +36,20 @@ export const extendSchema = (schema: string): string => {
         locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
       };
 
+      const computedDirective = {
+        kind: 'DirectiveDefinition',
+        name: { kind: 'Name', value: 'computed' },
+        arguments: [],
+        locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
+      };
+
       return {
         ...node,
-        definitions: [directiveDefinition, ...node.definitions]
+        definitions: [
+          derivedFromDirective,
+          computedDirective,
+          ...node.definitions
+        ]
       };
     },
     ObjectTypeDefinition(node) {
@@ -137,4 +148,9 @@ export const getNonNullType = <T>(type: T): T => {
 export const getDerivedFromDirective = (field: GraphQLField<any, any>) => {
   const directives = field.astNode?.directives ?? [];
   return directives.find(dir => dir.name.value === 'derivedFrom');
+};
+
+export const getComputedDirective = (field: GraphQLField<any, any>) => {
+  const directives = field.astNode?.directives ?? [];
+  return directives.find(dir => dir.name.value === 'computed');
 };

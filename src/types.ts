@@ -15,6 +15,17 @@ export type TemplateSource = {
   template: string;
 };
 
+export type ComputedFieldResolver = (
+  parent: Record<string, any>,
+  args: Record<string, any>,
+  context: { knex: import('knex').Knex }
+) => any;
+
+export type ComputedResolvers = Record<
+  string,
+  Record<string, ComputedFieldResolver>
+>;
+
 export interface CheckpointOptions {
   /** Setting this to true will trigger reset of database on config changes. */
   resetOnConfigChange?: boolean;
@@ -42,6 +53,11 @@ export interface CheckpointOptions {
    * This can speed up indexing process if you don't need block data.
    */
   skipBlockFetching?: boolean;
+  /**
+   * Custom resolvers for @computed fields.
+   * Format: { EntityName: { fieldName: resolverFn } }
+   */
+  resolvers?: ComputedResolvers;
 }
 
 export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;
