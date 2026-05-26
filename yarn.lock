@@ -1034,9 +1034,9 @@
     "@sinonjs/commons" "^3.0.0"
 
 "@snapshot-labs/eslint-config-base@^0.1.0-beta.21":
-  version "0.1.0-beta.21"
-  resolved "https://registry.yarnpkg.com/@snapshot-labs/eslint-config-base/-/eslint-config-base-0.1.0-beta.21.tgz#286c34f86d7c9cde864a2f954f89ba6b83a78729"
-  integrity sha512-1ZuKV3bn8OW3l9NgA0wnt55khoc0hIWBbkNjIytPnG00WlJTWLNgjHAhRQHaD4swK/3oaj8GSTxiOm0eEIfXeA==
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@snapshot-labs/eslint-config-base/-/eslint-config-base-0.1.0.tgz#d981a0a2e21b94c4b1fc11b82398bdc5032ec8b4"
+  integrity sha512-3ZuW3qC5PSaORW5vWJOQhSp38F6pNlctwNAN4SLcShPykiyKWA6Hr3LPiFMg4TORqfk7IKr3gDB0HxZTvEUbsg==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^8.29.1"
     "@typescript-eslint/parser" "^8.29.1"
