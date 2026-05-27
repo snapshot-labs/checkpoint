@@ -390,7 +390,10 @@ export class GqlEntityController {
       };
 
       this.getTypeFields(nestedType).forEach(field => {
-        if (getComputedDirective(field)) return;
+        if (getComputedDirective(field)) {
+          orderByValues[field.name] = { value: field.name };
+          return;
+        }
 
         // all field types in a where input variable must be optional
         // so we try to extract the non null type here.
@@ -656,11 +659,14 @@ export class GqlEntityController {
         if (!entityResolvers[typeName]) entityResolvers[typeName] = {};
 
         for (const [fieldName, resolver] of Object.entries(fields)) {
+          const resolveFn =
+            typeof resolver === 'function' ? resolver : resolver.resolve;
+
           entityResolvers[typeName][fieldName] = (
             parent: Record<string, any>,
             args: Record<string, any>,
             context: any
-          ) => resolver(parent, args, context);
+          ) => resolveFn(parent, args, context);
         }
       }
 

@@ -94,7 +94,8 @@ export default class Checkpoint {
     return {
       log: this.log.child({ component: 'resolver' }),
       knex: this.knex,
-      pg: this.pg
+      pg: this.pg,
+      computedResolvers: this.opts?.resolvers
     };
   }
 

@@ -16,6 +16,7 @@ import {
 } from 'graphql-parse-resolve-info';
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
+import { ComputedResolvers } from '../types';
 import {
   applyDefaultOrder,
   applyQueryFilter,
@@ -62,6 +63,7 @@ export type ResolverContext = ResolverContextInput & {
     field: string,
     queryFilter: QueryFilter
   ) => DataLoader<readonly unknown[], any>;
+  computedResolvers?: ComputedResolvers;
 };
 
 export async function queryMulti(
@@ -82,6 +84,15 @@ export async function queryMulti(
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
+
+  const entityComputedResolvers =
+    context.computedResolvers?.[returnType.name] || {};
+  for (const [fieldName, resolver] of Object.entries(entityComputedResolvers)) {
+    if (typeof resolver !== 'function' && resolver.sql) {
+      query = query.select(resolver.sql(knex).as(fieldName));
+    }
+  }
+
   query = applyQueryFilter(query, tableName, {
     block: args.block,
     indexer: args.indexer
@@ -238,8 +249,15 @@ export async function queryMulti(
   }
 
   if (args.orderBy) {
+    const computedResolver =
+      entityComputedResolvers[args.orderBy];
+    const isComputedSql =
+      computedResolver &&
+      typeof computedResolver !== 'function' &&
+      computedResolver.sql;
+
     query = query.orderBy(
-      `${tableName}.${args.orderBy}`,
+      isComputedSql ? args.orderBy : `${tableName}.${args.orderBy}`,
       args.orderDirection?.toLowerCase() || 'desc'
     );
   }

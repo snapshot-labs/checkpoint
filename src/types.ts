@@ -15,11 +15,18 @@ export type TemplateSource = {
   template: string;
 };
 
-export type ComputedFieldResolver = (
+export type ComputedFieldResolverFn = (
   parent: Record<string, any>,
   args: Record<string, any>,
   context: { knex: import('knex').Knex }
 ) => any;
+
+export type ComputedFieldConfig = {
+  resolve: ComputedFieldResolverFn;
+  sql?: (knex: import('knex').Knex) => import('knex').Knex.QueryBuilder;
+};
+
+export type ComputedFieldResolver = ComputedFieldResolverFn | ComputedFieldConfig;
 
 export type ComputedResolvers = Record<
   string,
