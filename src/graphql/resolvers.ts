@@ -106,9 +106,32 @@ export async function queryMulti(
       return isListType(fieldType);
     };
 
+    const computedOps: Record<string, string> = {
+      '': '=',
+      '_not': '!=',
+      '_gt': '>',
+      '_gte': '>=',
+      '_lt': '<',
+      '_lte': '<=',
+      '_in': 'IN',
+      '_not_in': 'NOT IN'
+    };
+
     Object.entries(where).map((w: [string, any]) => {
-      // TODO: we could generate where as objects { name, column, operator, value }
-      // so we don't have to cut it there
+      for (const [name, config] of Object.entries(entityComputedResolvers)) {
+        for (const [suffix, op] of Object.entries(computedOps)) {
+          if (w[0] !== `${name}${suffix}`) continue;
+
+          const sub = `(${config.sql(knex).toQuery()})`;
+          if (op === 'IN' || op === 'NOT IN') {
+            const placeholders = w[1].map(() => '?').join(', ');
+            query = query.whereRaw(`${sub} ${op} (${placeholders})`, w[1]);
+          } else {
+            query = query.whereRaw(`${sub} ${op} ?`, [w[1]]);
+          }
+          return;
+        }
+      }
 
       if (w[0].endsWith('_not')) {
         const fieldName = w[0].slice(0, -4);

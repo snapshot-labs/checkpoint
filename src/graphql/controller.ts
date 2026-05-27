@@ -392,6 +392,20 @@ export class GqlEntityController {
       this.getTypeFields(nestedType).forEach(field => {
         if (getComputedDirective(field)) {
           orderByValues[field.name] = { value: field.name };
+
+          const fieldType = getNonNullType(field.type);
+          if (fieldType === GraphQLInt) {
+            for (const suffix of ['', '_not', '_gt', '_gte', '_lt', '_lte']) {
+              whereInputConfig.fields[`${field.name}${suffix}`] = {
+                type: GraphQLInt
+              };
+            }
+            for (const suffix of ['_in', '_not_in']) {
+              whereInputConfig.fields[`${field.name}${suffix}`] = {
+                type: new GraphQLList(GraphQLInt)
+              };
+            }
+          }
           return;
         }
 
