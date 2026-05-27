@@ -87,10 +87,8 @@ export async function queryMulti(
 
   const entityComputedResolvers =
     context.computedResolvers?.[returnType.name] || {};
-  for (const [fieldName, resolver] of Object.entries(entityComputedResolvers)) {
-    if (typeof resolver !== 'function' && resolver.sql) {
-      query = query.select(resolver.sql(knex).as(fieldName));
-    }
+  for (const [fieldName, config] of Object.entries(entityComputedResolvers)) {
+    query = query.select(config.sql(knex).as(fieldName));
   }
 
   query = applyQueryFilter(query, tableName, {
@@ -249,15 +247,9 @@ export async function queryMulti(
   }
 
   if (args.orderBy) {
-    const computedResolver =
-      entityComputedResolvers[args.orderBy];
-    const isComputedSql =
-      computedResolver &&
-      typeof computedResolver !== 'function' &&
-      computedResolver.sql;
-
+    const isComputed = args.orderBy in entityComputedResolvers;
     query = query.orderBy(
-      isComputedSql ? args.orderBy : `${tableName}.${args.orderBy}`,
+      isComputed ? args.orderBy : `${tableName}.${args.orderBy}`,
       args.orderDirection?.toLowerCase() || 'desc'
     );
   }

@@ -658,15 +658,16 @@ export class GqlEntityController {
       for (const [typeName, fields] of Object.entries(this.computedResolvers)) {
         if (!entityResolvers[typeName]) entityResolvers[typeName] = {};
 
-        for (const [fieldName, resolver] of Object.entries(fields)) {
-          const resolveFn =
-            typeof resolver === 'function' ? resolver : resolver.resolve;
-
+        for (const [fieldName, config] of Object.entries(fields)) {
           entityResolvers[typeName][fieldName] = (
             parent: Record<string, any>,
             args: Record<string, any>,
             context: any
-          ) => resolveFn(parent, args, context);
+          ) => {
+            if (parent[fieldName] !== undefined) return parent[fieldName];
+            if (config.resolve) return config.resolve(parent, args, context);
+            return 0;
+          };
         }
       }
 
