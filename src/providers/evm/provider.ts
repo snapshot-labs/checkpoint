@@ -368,10 +368,11 @@ export class EvmProvider extends BaseProvider {
       topics?: (string | string[])[];
     } = {};
 
-    let signal: AbortSignal | undefined;
+    // Always set a timeout so a hung socket becomes a thrown error that the
+    // retry loops can handle, instead of silently freezing the indexer forever.
+    const signal = AbortSignal.timeout(CLIENT_TIMEOUT);
 
     if ('blockHash' in filter) {
-      signal = AbortSignal.timeout(CLIENT_TIMEOUT);
       params.blockHash = filter.blockHash;
     }
 
@@ -432,6 +433,7 @@ export class EvmProvider extends BaseProvider {
 
     let currentFrom = fromBlock;
     let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
+    let attempt = 0;
     while (true) {
       try {
         const logs = await this._getLogs({
@@ -463,9 +465,16 @@ export class EvmProvider extends BaseProvider {
           continue;
         }
 
-        this.log.error(
-          { fromBlock: currentFrom, toBlock: currentTo, address, err },
-          'getLogs failed'
+        attempt++;
+        this.log.warn(
+          {
+            attempt,
+            fromBlock: currentFrom,
+            toBlock: currentTo,
+            address,
+            err: err instanceof Error ? err.message : err
+          },
+          'getLogs failed, retrying in 5s'
         );
 
         await sleep(5000);

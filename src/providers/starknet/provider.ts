@@ -13,7 +13,14 @@ import {
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
-import { sleep } from '../../utils/helpers';
+import { sleep, withTimeout } from '../../utils/helpers';
+
+/**
+ * Timeout for provider requests in milliseconds. Guards every network call so a
+ * hung socket becomes a thrown error the retry loops handle, rather than a
+ * silent indexer freeze.
+ */
+const CLIENT_TIMEOUT = 5 * 1000;
 
 class CustomJsonRpcError extends Error {
   constructor(
@@ -54,16 +61,28 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async getNetworkIdentifier(): Promise<string> {
-    const result = await this.provider.getChainId();
+    const result = await withTimeout(
+      this.provider.getChainId(),
+      CLIENT_TIMEOUT,
+      'getChainId'
+    );
     return `starknet_${result}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    return this.provider.getBlockNumber();
+    return withTimeout(
+      this.provider.getBlockNumber(),
+      CLIENT_TIMEOUT,
+      'getBlockNumber'
+    );
   }
 
   async getBlockHash(blockNumber: number) {
-    const block = await this.provider.getBlock(blockNumber);
+    const block = await withTimeout(
+      this.provider.getBlock(blockNumber),
+      CLIENT_TIMEOUT,
+      'getBlock'
+    );
     return block.block_hash;
   }
 
@@ -76,7 +95,11 @@ export class StarknetProvider extends BaseProvider {
         skipBlockFetching && this.logsCache.has(blockNum);
 
       if (!hasPreloadedBlockEvents) {
-        block = await this.provider.getBlockWithTxHashes(blockNum);
+        block = await withTimeout(
+          this.provider.getBlockWithTxHashes(blockNum),
+          CLIENT_TIMEOUT,
+          'getBlockWithTxHashes'
+        );
       }
 
       if (block && (!isFullBlock(block) || block.block_number !== blockNum)) {
@@ -352,6 +375,7 @@ export class StarknetProvider extends BaseProvider {
   private async getBlockWithReceipts(blockId: BLOCK_ID) {
     const res = await fetch(this.instance.config.network_node_url, {
       method: 'POST',
+      signal: AbortSignal.timeout(CLIENT_TIMEOUT),
       headers: {
         'Content-Type': 'application/json'
       },
@@ -401,12 +425,16 @@ export class StarknetProvider extends BaseProvider {
 
       let continuationToken: string | undefined;
       do {
-        const result = await this.provider.getEvents({
-          from_block: { block_hash: blockHash },
-          to_block: { block_hash: blockHash },
-          chunk_size: 1000,
-          continuation_token: continuationToken
-        });
+        const result = await withTimeout(
+          this.provider.getEvents({
+            from_block: { block_hash: blockHash },
+            to_block: { block_hash: blockHash },
+            chunk_size: 1000,
+            continuation_token: continuationToken
+          }),
+          CLIENT_TIMEOUT,
+          'getEvents'
+        );
 
         events = events.concat(result.events);
 
@@ -435,24 +463,37 @@ export class StarknetProvider extends BaseProvider {
     let events: Event[] = [];
 
     let continuationToken: string | undefined;
+    let attempt = 0;
     do {
       try {
-        const result = await this.provider.getEvents({
-          from_block: { block_number: fromBlock },
-          to_block: { block_number: toBlock },
-          address: address,
-          keys: [eventNames.map(name => this.getEventHash(name))],
-          chunk_size: 1000,
-          continuation_token: continuationToken
-        });
+        const result = await withTimeout(
+          this.provider.getEvents({
+            from_block: { block_number: fromBlock },
+            to_block: { block_number: toBlock },
+            address: address,
+            keys: [eventNames.map(name => this.getEventHash(name))],
+            chunk_size: 1000,
+            continuation_token: continuationToken
+          }),
+          CLIENT_TIMEOUT,
+          'getEvents'
+        );
 
         events = events.concat(result.events);
 
         continuationToken = result.continuation_token;
       } catch (e) {
-        this.log.error(
-          { fromBlock, toBlock, continuationToken, address, err: e },
-          'getEvents failed'
+        attempt++;
+        this.log.warn(
+          {
+            attempt,
+            fromBlock,
+            toBlock,
+            continuationToken,
+            address,
+            err: e instanceof Error ? e.message : e
+          },
+          'getEvents failed, retrying in 5s'
         );
 
         await sleep(5000);
