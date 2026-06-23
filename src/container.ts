@@ -299,13 +299,22 @@ export class Container implements Instance {
       let preloadedBlock: number | null = null;
 
       if (!this.config.tx_fn && !this.config.global_events) {
-        checkpointBlock = await this.getNextCheckpointBlock(blockNumber);
+        try {
+          checkpointBlock = await this.getNextCheckpointBlock(blockNumber);
 
-        if (checkpointBlock) {
-          blockNumber = checkpointBlock;
-        } else if (blockNumber <= this.preloadEndBlock) {
-          preloadedBlock = await this.preload(blockNumber);
-          blockNumber = preloadedBlock || this.preloadEndBlock + 1;
+          if (checkpointBlock) {
+            blockNumber = checkpointBlock;
+          } else if (blockNumber <= this.preloadEndBlock) {
+            preloadedBlock = await this.preload(blockNumber);
+            blockNumber = preloadedBlock || this.preloadEndBlock + 1;
+          }
+        } catch (err) {
+          this.log.error(
+            { blockNumber, err },
+            'error occurred while fetching next block, retrying'
+          );
+          await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
+          continue;
         }
       }
 
