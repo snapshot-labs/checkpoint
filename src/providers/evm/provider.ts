@@ -545,9 +545,13 @@ export class EvmProvider extends BaseProvider {
     let events: Log[] = [];
     for (const chunk of chunks) {
       const address = chunk.map(source => source.contract);
-      const topics = chunk.flatMap(source =>
-        source.events.map(event => this.getEventHash(event.name))
-      );
+      const topics = [
+        ...new Set(
+          chunk.flatMap(source =>
+            source.events.map(event => this.getEventHash(event.name))
+          )
+        )
+      ];
 
       const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [
         topics
