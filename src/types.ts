@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import pino from 'pino';
 import { z } from 'zod';
 import { Instance } from './providers';
@@ -16,11 +17,11 @@ export type TemplateSource = {
 };
 
 export type ComputedFieldConfig = {
-  sql: (knex: import('knex').Knex) => import('knex').Knex.QueryBuilder;
+  sql: (knex: Knex) => Knex.QueryBuilder;
   resolve?: (
     parent: Record<string, any>,
     args: Record<string, any>,
-    context: { knex: import('knex').Knex }
+    context: { knex: Knex }
   ) => any;
 };
 

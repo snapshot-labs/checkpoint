@@ -108,13 +108,13 @@ export async function queryMulti(
 
     const computedOps: Record<string, string> = {
       '': '=',
-      '_not': '!=',
-      '_gt': '>',
-      '_gte': '>=',
-      '_lt': '<',
-      '_lte': '<=',
-      '_in': 'IN',
-      '_not_in': 'NOT IN'
+      _not: '!=',
+      _gt: '>',
+      _gte: '>=',
+      _lt: '<',
+      _lte: '<=',
+      _in: 'IN',
+      _not_in: 'NOT IN'
     };
 
     Object.entries(where).map((w: [string, any]) => {
