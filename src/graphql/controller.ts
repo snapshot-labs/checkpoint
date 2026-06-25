@@ -26,7 +26,7 @@ import { Knex } from 'knex';
 import pluralize from 'pluralize';
 import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
 import { KnexType } from '../knex';
-import { ComputedResolvers, OverridesConfig } from '../types';
+import { OverridesConfig } from '../types';
 import { getNestedResolver, queryMulti, querySingle } from './resolvers';
 import {
   generateQueryForEntity,
@@ -71,14 +71,9 @@ type WhereResult = {
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
   private readonly decimalTypes: NonNullable<OverridesConfig['decimal_types']>;
-  private readonly computedResolvers: ComputedResolvers;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(
-    typeDefs: string | Source,
-    config?: OverridesConfig,
-    computedResolvers?: ComputedResolvers
-  ) {
+  constructor(typeDefs: string | Source, config?: OverridesConfig) {
     this.schema = buildSchema(typeDefs);
     this.decimalTypes = config?.decimal_types || {
       Decimal: {
@@ -90,7 +85,6 @@ export class GqlEntityController {
         d: 8
       }
     };
-    this.computedResolvers = computedResolvers || {};
   }
 
   /**
@@ -390,25 +384,6 @@ export class GqlEntityController {
       };
 
       this.getTypeFields(nestedType).forEach(field => {
-        if (getComputedDirective(field)) {
-          orderByValues[field.name] = { value: field.name };
-
-          const fieldType = getNonNullType(field.type);
-          if (fieldType === GraphQLInt) {
-            for (const suffix of ['', '_not', '_gt', '_gte', '_lt', '_lte']) {
-              whereInputConfig.fields[`${field.name}${suffix}`] = {
-                type: GraphQLInt
-              };
-            }
-            for (const suffix of ['_in', '_not_in']) {
-              whereInputConfig.fields[`${field.name}${suffix}`] = {
-                type: new GraphQLList(GraphQLInt)
-              };
-            }
-          }
-          return;
-        }
-
         // all field types in a where input variable must be optional
         // so we try to extract the non null type here.
         let nonNullFieldType = getNonNullType(field.type);
@@ -667,27 +642,9 @@ export class GqlEntityController {
     const schema = new GraphQLSchema({ query });
 
     if (opts?.addResolvers) {
-      const entityResolvers = this.generateEntityResolvers(entityQueryFields);
-
-      for (const [typeName, fields] of Object.entries(this.computedResolvers)) {
-        if (!entityResolvers[typeName]) entityResolvers[typeName] = {};
-
-        for (const [fieldName, config] of Object.entries(fields)) {
-          entityResolvers[typeName][fieldName] = (
-            parent: Record<string, any>,
-            args: Record<string, any>,
-            context: any
-          ) => {
-            if (parent[fieldName] !== undefined) return parent[fieldName];
-            if (config.resolve) return config.resolve(parent, args, context);
-            return 0;
-          };
-        }
-      }
-
       return addResolversToSchema({
         schema,
-        resolvers: entityResolvers
+        resolvers: this.generateEntityResolvers(entityQueryFields)
       });
     }
 

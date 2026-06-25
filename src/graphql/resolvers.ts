@@ -55,6 +55,7 @@ export type ResolverContextInput = {
   log: Logger;
   knex: Knex;
   pg: PgPool;
+  computedResolvers?: ComputedResolvers;
 };
 
 export type ResolverContext = ResolverContextInput & {
@@ -63,7 +64,6 @@ export type ResolverContext = ResolverContextInput & {
     field: string,
     queryFilter: QueryFilter
   ) => DataLoader<readonly unknown[], any>;
-  computedResolvers?: ComputedResolvers;
 };
 
 export async function queryMulti(
@@ -106,29 +106,48 @@ export async function queryMulti(
       return isListType(fieldType);
     };
 
-    const computedOps: Record<string, string> = {
-      '': '=',
-      _not: '!=',
-      _gt: '>',
-      _gte: '>=',
-      _lt: '<',
-      _lte: '<=',
-      _in: 'IN',
-      _not_in: 'NOT IN'
+    const buildComputedWhere = (
+      sub: string,
+      suffix: string,
+      value: any
+    ): { sql: string; bindings: any[] } | null => {
+      const ops: Record<string, string> = {
+        '': '=',
+        _not: '!=',
+        _gt: '>',
+        _gte: '>=',
+        _lt: '<',
+        _lte: '<='
+      };
+      if (suffix in ops)
+        return { sql: `${sub} ${ops[suffix]} ?`, bindings: [value] };
+      if (suffix === '_in' || suffix === '_not_in') {
+        const op = suffix === '_in' ? 'IN' : 'NOT IN';
+        const placeholders = value.map(() => '?').join(', ');
+        return { sql: `${sub} ${op} (${placeholders})`, bindings: value };
+      }
+      if (suffix === '_contains')
+        return { sql: `${sub} LIKE ?`, bindings: [`%${value}%`] };
+      if (suffix === '_not_contains')
+        return { sql: `${sub} NOT LIKE ?`, bindings: [`%${value}%`] };
+      if (suffix === '_contains_nocase')
+        return { sql: `${sub} ILIKE ?`, bindings: [`%${value}%`] };
+      if (suffix === '_not_contains_nocase')
+        return { sql: `${sub} NOT ILIKE ?`, bindings: [`%${value}%`] };
+      return null;
     };
 
     Object.entries(where).map((w: [string, any]) => {
       for (const [name, config] of Object.entries(entityComputedResolvers)) {
-        for (const [suffix, op] of Object.entries(computedOps)) {
-          if (w[0] !== `${name}${suffix}`) continue;
-
-          const sub = `(${config.sql(knex).toQuery()})`;
-          if (op === 'IN' || op === 'NOT IN') {
-            const placeholders = w[1].map(() => '?').join(', ');
-            query = query.whereRaw(`${sub} ${op} (${placeholders})`, w[1]);
-          } else {
-            query = query.whereRaw(`${sub} ${op} ?`, [w[1]]);
-          }
+        if (!w[0].startsWith(name)) continue;
+        const suffix = w[0].slice(name.length);
+        const built = buildComputedWhere(
+          `(${config.sql(knex).toQuery()})`,
+          suffix,
+          w[1]
+        );
+        if (built) {
+          query = query.whereRaw(built.sql, built.bindings);
           return;
         }
       }

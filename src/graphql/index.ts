@@ -33,9 +33,16 @@ export const createGetLoader = (context: ResolverContextInput) => {
         const tableName = getTableName(name);
 
         let query = context.knex
-          .select('*')
+          .select(`${tableName}.*`)
           .from(tableName)
           .whereIn(field, ids as string[]);
+
+        const computed = Object.entries(context.computedResolvers || {}).find(
+          ([typeName]) => typeName.toLowerCase() === name
+        )?.[1];
+        for (const [fieldName, config] of Object.entries(computed || {})) {
+          query = query.select(config.sql(context.knex).as(fieldName));
+        }
 
         query = applyQueryFilter(query, tableName, filter);
         query = applyDefaultOrder(query, tableName);

@@ -30,8 +30,7 @@ export default class Checkpoint {
     this.schema = extendSchema(schema);
     this.entityController = new GqlEntityController(
       this.schema,
-      opts?.overridesConfig,
-      opts?.resolvers
+      opts?.overridesConfig
     );
 
     this.opts = opts;
