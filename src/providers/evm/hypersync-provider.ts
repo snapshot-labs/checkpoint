@@ -3,6 +3,7 @@ import { EvmProvider } from './provider';
 import { Block } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
+import { sleep } from '../../utils/helpers';
 
 type FetchedBlock = {
   number: number;
@@ -42,6 +43,43 @@ type HyperSyncResponse = {
 };
 
 const PRELOAD_RANGE = 1000000;
+
+const MAX_RETRIES = 8;
+const BASE_RETRY_DELAY = 1000;
+const MAX_RETRY_DELAY = 30000;
+const RATE_LIMIT_WINDOW = 60000;
+
+const REQUESTS_PER_MINUTE = 30;
+
+/**
+ * Spaces out requests so that no more than `requestsPerMinute` are issued in
+ * any rolling minute. A single instance is shared across all HyperSync
+ * providers in the process because the rate limit is enforced globally across
+ * all networks.
+ */
+class RateLimiter {
+  private readonly minInterval: number;
+  private nextSlot = 0;
+
+  constructor(requestsPerMinute: number) {
+    this.minInterval = Math.ceil(60000 / requestsPerMinute);
+  }
+
+  async wait(): Promise<void> {
+    const now = Date.now();
+    const slot = Math.max(now, this.nextSlot);
+    this.nextSlot = slot + this.minInterval;
+
+    const delay = slot - now;
+    if (delay > 0) await sleep(delay);
+  }
+
+  pauseFor(ms: number) {
+    this.nextSlot = Math.max(this.nextSlot, Date.now() + ms);
+  }
+}
+
+const sharedRateLimiter = new RateLimiter(REQUESTS_PER_MINUTE);
 
 const FIELD_SELECTION = {
   block: ['number', 'timestamp', 'hash', 'parent_hash'],
@@ -199,24 +237,57 @@ export class HyperSyncEvmProvider extends EvmProvider {
     return this.hyperSyncUrl;
   }
 
+  private getResetSeconds(res: Response): number | null {
+    const reset = res.headers.get('x-ratelimit-reset');
+    if (reset === null) return null;
+
+    const seconds = Number(reset);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  }
+
+  private getRetryDelay(res: Response, attempt: number): number {
+    const resetSeconds = this.getResetSeconds(res);
+    if (resetSeconds !== null) {
+      return Math.min((resetSeconds + 1) * 1000, RATE_LIMIT_WINDOW);
+    }
+
+    return Math.min(BASE_RETRY_DELAY * 2 ** attempt, MAX_RETRY_DELAY);
+  }
+
   private async query(
     body: Record<string, unknown>
   ): Promise<HyperSyncResponse> {
     const url = await this.getHyperSyncUrl();
 
-    const res = await fetch(`${url}/query`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiToken}`
-      },
-      body: JSON.stringify(body)
-    });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      await sharedRateLimiter.wait();
 
-    if (!res.ok) {
-      throw new Error(`HyperSync query failed: ${res.statusText}`);
+      const res = await fetch(`${url}/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiToken}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        return res.json();
+      }
+
+      const retryable = res.status === 429 || res.status >= 500;
+      if (!retryable || attempt === MAX_RETRIES) {
+        throw new Error(`HyperSync query failed: ${res.statusText}`);
+      }
+
+      const delay = this.getRetryDelay(res, attempt);
+      if (res.status === 429) {
+        sharedRateLimiter.pauseFor(delay);
+      }
+
+      await sleep(delay);
     }
 
-    return res.json();
+    throw new Error('HyperSync query failed: retries exhausted');
   }
 }
