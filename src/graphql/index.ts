@@ -15,6 +15,7 @@ import {
   getTableName,
   QueryFilter
 } from '../utils/database';
+import { getComputedConfigs } from '../utils/graphql';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -37,10 +38,8 @@ export const createGetLoader = (context: ResolverContextInput) => {
           .from(tableName)
           .whereIn(field, ids as string[]);
 
-        const computed = Object.entries(context.computedResolvers || {}).find(
-          ([typeName]) => typeName.toLowerCase() === name
-        )?.[1];
-        for (const [fieldName, config] of Object.entries(computed || {})) {
+        const computed = getComputedConfigs(context.computedResolvers, name);
+        for (const [fieldName, config] of Object.entries(computed)) {
           query = query.select(config.sql(context.knex).as(fieldName));
         }
 

@@ -23,7 +23,11 @@ import {
   getTableName,
   QueryFilter
 } from '../utils/database';
-import { getDerivedFromDirective, getNonNullType } from '../utils/graphql';
+import {
+  getComputedConfigs,
+  getDerivedFromDirective,
+  getNonNullType
+} from '../utils/graphql';
 import { Logger } from '../utils/logger';
 
 type BaseArgs = {
@@ -85,8 +89,10 @@ export async function queryMulti(
 
   let query = knex.select(`${tableName}.*`).from(tableName);
 
-  const entityComputedResolvers =
-    context.computedResolvers?.[returnType.name] || {};
+  const entityComputedResolvers = getComputedConfigs(
+    context.computedResolvers,
+    returnType.name
+  );
   for (const [fieldName, config] of Object.entries(entityComputedResolvers)) {
     query = query.select(config.sql(knex).as(fieldName));
   }
@@ -106,34 +112,34 @@ export async function queryMulti(
       return isListType(fieldType);
     };
 
+    const cmpOps: Record<string, string> = {
+      '': '=',
+      _not: '!=',
+      _gt: '>',
+      _gte: '>=',
+      _lt: '<',
+      _lte: '<='
+    };
+    const likeOps: Record<string, string> = {
+      _contains: 'LIKE',
+      _not_contains: 'NOT LIKE',
+      _contains_nocase: 'ILIKE',
+      _not_contains_nocase: 'NOT ILIKE'
+    };
     const buildComputedWhere = (
       sub: string,
       suffix: string,
       value: any
     ): { sql: string; bindings: any[] } | null => {
-      const ops: Record<string, string> = {
-        '': '=',
-        _not: '!=',
-        _gt: '>',
-        _gte: '>=',
-        _lt: '<',
-        _lte: '<='
-      };
-      if (suffix in ops)
-        return { sql: `${sub} ${ops[suffix]} ?`, bindings: [value] };
+      if (suffix in cmpOps)
+        return { sql: `${sub} ${cmpOps[suffix]} ?`, bindings: [value] };
+      if (suffix in likeOps)
+        return { sql: `${sub} ${likeOps[suffix]} ?`, bindings: [`%${value}%`] };
       if (suffix === '_in' || suffix === '_not_in') {
         const op = suffix === '_in' ? 'IN' : 'NOT IN';
         const placeholders = value.map(() => '?').join(', ');
         return { sql: `${sub} ${op} (${placeholders})`, bindings: value };
       }
-      if (suffix === '_contains')
-        return { sql: `${sub} LIKE ?`, bindings: [`%${value}%`] };
-      if (suffix === '_not_contains')
-        return { sql: `${sub} NOT LIKE ?`, bindings: [`%${value}%`] };
-      if (suffix === '_contains_nocase')
-        return { sql: `${sub} ILIKE ?`, bindings: [`%${value}%`] };
-      if (suffix === '_not_contains_nocase')
-        return { sql: `${sub} NOT ILIKE ?`, bindings: [`%${value}%`] };
       return null;
     };
 

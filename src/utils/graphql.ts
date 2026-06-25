@@ -11,43 +11,34 @@ import {
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
+import { ComputedResolvers } from '../types';
+
+const directiveDef = (name: string, args: any[] = []) => ({
+  kind: 'DirectiveDefinition',
+  name: { kind: 'Name', value: name },
+  arguments: args,
+  locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
+});
+
+const nonNullStringArg = (name: string) => ({
+  kind: 'InputValueDefinition',
+  name: { kind: 'Name', value: name },
+  type: {
+    kind: 'NonNullType',
+    type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } }
+  }
+});
 
 export const extendSchema = (schema: string): string => {
   const ast = parse(schema);
 
   const updatedAst = visit(ast, {
     Document(node) {
-      const derivedFromDirective = {
-        kind: 'DirectiveDefinition',
-        name: { kind: 'Name', value: 'derivedFrom' },
-        arguments: [
-          {
-            kind: 'InputValueDefinition',
-            name: { kind: 'Name', value: 'field' },
-            type: {
-              kind: 'NonNullType',
-              type: {
-                kind: 'NamedType',
-                name: { kind: 'Name', value: 'String' }
-              }
-            }
-          }
-        ],
-        locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
-      };
-
-      const computedDirective = {
-        kind: 'DirectiveDefinition',
-        name: { kind: 'Name', value: 'computed' },
-        arguments: [],
-        locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
-      };
-
       return {
         ...node,
         definitions: [
-          derivedFromDirective,
-          computedDirective,
+          directiveDef('derivedFrom', [nonNullStringArg('field')]),
+          directiveDef('computed'),
           ...node.definitions
         ]
       };
@@ -145,12 +136,21 @@ export const getNonNullType = <T>(type: T): T => {
   return type;
 };
 
-export const getDerivedFromDirective = (field: GraphQLField<any, any>) => {
-  const directives = field.astNode?.directives ?? [];
-  return directives.find(dir => dir.name.value === 'derivedFrom');
-};
+const getDirective = (field: GraphQLField<any, any>, name: string) =>
+  (field.astNode?.directives ?? []).find(d => d.name.value === name);
 
-export const getComputedDirective = (field: GraphQLField<any, any>) => {
-  const directives = field.astNode?.directives ?? [];
-  return directives.find(dir => dir.name.value === 'computed');
-};
+export const getDerivedFromDirective = (f: GraphQLField<any, any>) =>
+  getDirective(f, 'derivedFrom');
+
+export const getComputedDirective = (f: GraphQLField<any, any>) =>
+  getDirective(f, 'computed');
+
+export const getComputedConfigs = (
+  resolvers: ComputedResolvers | undefined,
+  typeName: string
+) =>
+  resolvers
+    ? Object.entries(resolvers).find(
+        ([k]) => k.toLowerCase() === typeName.toLowerCase()
+      )?.[1] || {}
+    : {};
