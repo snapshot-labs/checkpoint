@@ -256,9 +256,9 @@ export class Container implements Instance {
         checkpoints = await this.indexer
           .getProvider()
           .getCheckpointsRange(currentBlock, endBlock);
-      } catch (e) {
+      } catch (err) {
         this.log.error(
-          { blockNumber: currentBlock, err: e },
+          { blockNumber: currentBlock, err },
           'error occurred during checkpoint fetching'
         );
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
@@ -338,9 +338,9 @@ export class Container implements Instance {
 
               this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
             }
-          } catch (e) {
+          } catch (err) {
             this.log.error(
-              { blockNumber: blockNumber, err: e },
+              { blockNumber: blockNumber, err },
               'error occurred during latest block check, ignoring for now'
             );
           }
@@ -455,9 +455,9 @@ export class Container implements Instance {
         } else {
           current -= 1;
         }
-      } catch (e) {
+      } catch (err) {
         this.log.error(
-          { blockNumber: current, err: e },
+          { blockNumber: current, err },
           'error occurred during block hash check'
         );
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
