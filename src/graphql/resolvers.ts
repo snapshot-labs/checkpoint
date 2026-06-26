@@ -144,6 +144,8 @@ export async function queryMulti(
     };
 
     Object.entries(where).map((w: [string, any]) => {
+      // TODO: we could generate where as objects { name, column, operator, value }
+      // so we don't have to cut it there
       for (const [name, config] of Object.entries(entityComputedResolvers)) {
         if (!w[0].startsWith(name)) continue;
         const suffix = w[0].slice(name.length);
