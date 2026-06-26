@@ -88,17 +88,17 @@ export class StarknetProvider extends BaseProvider {
         blockNumber: blockNum,
         blockHash: block?.block_hash ?? null
       });
-    } catch (e) {
-      if ((e as Error).message.includes('Block not found')) {
+    } catch (err) {
+      if ((err as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
       }
 
       this.log.error(
-        { blockNumber: blockNum, err: e },
+        { blockNumber: blockNum, err },
         'getting block failed... retrying'
       );
-      throw e;
+      throw err;
     }
 
     if (block && parentHash && block.parent_hash !== parentHash) {
@@ -449,9 +449,9 @@ export class StarknetProvider extends BaseProvider {
         events = events.concat(result.events);
 
         continuationToken = result.continuation_token;
-      } catch (e) {
+      } catch (err) {
         this.log.error(
-          { fromBlock, toBlock, continuationToken, address, err: e },
+          { fromBlock, toBlock, continuationToken, address, err },
           'getEvents failed'
         );
 
