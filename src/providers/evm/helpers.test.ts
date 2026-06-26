@@ -101,4 +101,42 @@ describe('getRangeHint', () => {
       });
     });
   });
+
+  describe('Edge RPC error (code: -32012)', () => {
+    it('should return half the current range', () => {
+      const edgeError = new CustomJsonRpcError(
+        'getLogs request exceeded max allowed range',
+        -32012,
+        {}
+      );
+
+      const result = getRangeHint(edgeError, {
+        from: 1000,
+        to: 2000
+      });
+
+      expect(result).toEqual({
+        from: 1000,
+        to: 1500
+      });
+    });
+
+    it('should round up', () => {
+      const edgeError = new CustomJsonRpcError(
+        'getLogs request exceeded max allowed range',
+        -32012,
+        {}
+      );
+
+      const result = getRangeHint(edgeError, {
+        from: 1000,
+        to: 1501
+      });
+
+      expect(result).toEqual({
+        from: 1000,
+        to: 1251
+      });
+    });
+  });
 });

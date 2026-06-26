@@ -26,7 +26,8 @@ export function getRangeHint(err: unknown, currentRange: Range): Range | null {
   }
 
   // Ankr (code: -32062): Block range is too large
-  if (err.code === -32062) {
+  // Edge RPC (code: -32012): getLogs request exceeded max allowed range
+  if (err.code === -32062 || err.code === -32012) {
     // We have no range in the error data, so we return the current range, but half as long
     return {
       from: currentRange.from,
