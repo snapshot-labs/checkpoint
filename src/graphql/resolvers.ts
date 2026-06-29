@@ -16,13 +16,18 @@ import {
 } from 'graphql-parse-resolve-info';
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
+import { ComputedResolvers } from '../types';
 import {
   applyDefaultOrder,
   applyQueryFilter,
   getTableName,
   QueryFilter
 } from '../utils/database';
-import { getDerivedFromDirective, getNonNullType } from '../utils/graphql';
+import {
+  getComputedConfigs,
+  getDerivedFromDirective,
+  getNonNullType
+} from '../utils/graphql';
 import { Logger } from '../utils/logger';
 
 type BaseArgs = {
@@ -54,6 +59,7 @@ export type ResolverContextInput = {
   log: Logger;
   knex: Knex;
   pg: PgPool;
+  computedResolvers?: ComputedResolvers;
 };
 
 export type ResolverContext = ResolverContextInput & {
@@ -82,6 +88,15 @@ export async function queryMulti(
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
+
+  const entityComputedResolvers = getComputedConfigs(
+    context.computedResolvers,
+    returnType.name
+  );
+  for (const [fieldName, config] of Object.entries(entityComputedResolvers)) {
+    query = query.select(config.sql(knex).as(fieldName));
+  }
+
   query = applyQueryFilter(query, tableName, {
     block: args.block,
     indexer: args.indexer
@@ -97,9 +112,54 @@ export async function queryMulti(
       return isListType(fieldType);
     };
 
+    const cmpOps: Record<string, string> = {
+      '': '=',
+      _not: '!=',
+      _gt: '>',
+      _gte: '>=',
+      _lt: '<',
+      _lte: '<='
+    };
+    const likeOps: Record<string, string> = {
+      _contains: 'like',
+      _not_contains: 'not like',
+      _contains_nocase: 'ilike',
+      _not_contains_nocase: 'not ilike'
+    };
+    const applyComputedWhere = (
+      currentQuery: Knex.QueryBuilder,
+      sub: Knex.QueryBuilder,
+      suffix: string,
+      value: any
+    ): Knex.QueryBuilder | null => {
+      const expr = knex.raw('(?)', [sub]);
+      if (suffix in cmpOps)
+        return currentQuery.where(expr, cmpOps[suffix], value);
+      if (suffix in likeOps)
+        return currentQuery.where(expr, likeOps[suffix], `%${value}%`);
+      if (suffix === '_in') return currentQuery.where(expr, 'in', value);
+      if (suffix === '_not_in')
+        return currentQuery.where(expr, 'not in', value);
+      return null;
+    };
+
     Object.entries(where).map((w: [string, any]) => {
       // TODO: we could generate where as objects { name, column, operator, value }
       // so we don't have to cut it there
+      for (const [name, config] of Object.entries(entityComputedResolvers)) {
+        if (!w[0].startsWith(name)) continue;
+        const suffix = w[0].slice(name.length);
+        const applied = applyComputedWhere(
+          query,
+          config.sql(knex),
+          suffix,
+          w[1]
+        );
+        if (applied) {
+          query = applied;
+          return;
+        }
+      }
 
       if (w[0].endsWith('_not')) {
         const fieldName = w[0].slice(0, -4);
@@ -238,8 +298,9 @@ export async function queryMulti(
   }
 
   if (args.orderBy) {
+    const isComputed = args.orderBy in entityComputedResolvers;
     query = query.orderBy(
-      `${tableName}.${args.orderBy}`,
+      isComputed ? args.orderBy : `${tableName}.${args.orderBy}`,
       args.orderDirection?.toLowerCase() || 'desc'
     );
   }
@@ -334,7 +395,7 @@ export async function querySingle(
 }
 
 export const getNestedResolver =
-  (columnName: string) =>
+  (entityName: string) =>
   async (
     parent: Result,
     args: unknown,
@@ -369,7 +430,7 @@ export const getNestedResolver =
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
       const loaderResult = await getLoader(
-        columnName,
+        entityName,
         'id',
         queryFilter
       ).loadMany(parent[info.fieldName]);
@@ -389,7 +450,7 @@ export const getNestedResolver =
       }
 
       result = await getLoader(
-        columnName,
+        entityName,
         fieldArgument.value.value,
         queryFilter
       ).load(parent.id);

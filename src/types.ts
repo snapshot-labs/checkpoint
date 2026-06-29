@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import pino from 'pino';
 import { z } from 'zod';
 import { Instance } from './providers';
@@ -14,6 +15,15 @@ export type TemplateSource = {
   startBlock: number;
   template: string;
 };
+
+export type ComputedFieldConfig = {
+  sql: (knex: Knex) => Knex.QueryBuilder;
+};
+
+export type ComputedResolvers = Record<
+  string,
+  Record<string, ComputedFieldConfig>
+>;
 
 export interface CheckpointOptions {
   /** Setting this to true will trigger reset of database on config changes. */
@@ -42,6 +52,11 @@ export interface CheckpointOptions {
    * This can speed up indexing process if you don't need block data.
    */
   skipBlockFetching?: boolean;
+  /**
+   * Custom resolvers for @computed fields.
+   * Format: { EntityName: { fieldName: resolverFn } }
+   */
+  resolvers?: ComputedResolvers;
 }
 
 export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;

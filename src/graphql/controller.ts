@@ -30,6 +30,7 @@ import { OverridesConfig } from '../types';
 import { getNestedResolver, queryMulti, querySingle } from './resolvers';
 import {
   generateQueryForEntity,
+  getComputedDirective,
   getDerivedFromDirective,
   getNonNullType,
   multiEntityQueryName,
@@ -168,7 +169,7 @@ export class GqlEntityController {
 
             if (itemType instanceof GraphQLObjectType) {
               resolvers[field.name] = getNestedResolver(
-                multiEntityQueryName(itemType)
+                singleEntityQueryName(itemType)
               );
             }
           }
@@ -236,6 +237,8 @@ export class GqlEntityController {
           t.specificType('block_range', 'int8range').notNullable();
 
           this.getTypeFields(type).forEach(field => {
+            if (getComputedDirective(field)) return;
+
             const fieldType =
               field.type instanceof GraphQLNonNull
                 ? field.type.ofType

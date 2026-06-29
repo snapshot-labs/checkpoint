@@ -14,7 +14,7 @@ import {
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
 import { OverridesConfig } from './types';
-import { getDerivedFromDirective } from './utils/graphql';
+import { getComputedDirective, getDerivedFromDirective } from './utils/graphql';
 
 type TypeInfo = {
   type: string;
@@ -154,6 +154,8 @@ export const codegen = (
         : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
     contents += `    super(${modelName}.tableName, indexerName);\n\n`;
     typeFields.forEach(field => {
+      if (getComputedDirective(field)) return;
+
       const fieldType =
         field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (
@@ -189,6 +191,8 @@ export const codegen = (
     contents += `  }\n\n`;
 
     typeFields.forEach(field => {
+      if (getComputedDirective(field)) return;
+
       const fieldType =
         field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (
