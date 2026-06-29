@@ -1,6 +1,6 @@
 {
   "name": "@snapshot-labs/checkpoint",
-  "version": "0.1.0-beta.72",
+  "version": "0.1.0-beta.73",
   "license": "MIT",
   "bin": {
     "checkpoint": "dist/src/bin/index.js"
