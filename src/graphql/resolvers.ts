@@ -121,25 +121,25 @@ export async function queryMulti(
       _lte: '<='
     };
     const likeOps: Record<string, string> = {
-      _contains: 'LIKE',
-      _not_contains: 'NOT LIKE',
-      _contains_nocase: 'ILIKE',
-      _not_contains_nocase: 'NOT ILIKE'
+      _contains: 'like',
+      _not_contains: 'not like',
+      _contains_nocase: 'ilike',
+      _not_contains_nocase: 'not ilike'
     };
-    const buildComputedWhere = (
-      sub: string,
+    const applyComputedWhere = (
+      currentQuery: Knex.QueryBuilder,
+      sub: Knex.QueryBuilder,
       suffix: string,
       value: any
-    ): { sql: string; bindings: any[] } | null => {
+    ): Knex.QueryBuilder | null => {
+      const expr = knex.raw('(?)', [sub]);
       if (suffix in cmpOps)
-        return { sql: `${sub} ${cmpOps[suffix]} ?`, bindings: [value] };
+        return currentQuery.where(expr, cmpOps[suffix], value);
       if (suffix in likeOps)
-        return { sql: `${sub} ${likeOps[suffix]} ?`, bindings: [`%${value}%`] };
-      if (suffix === '_in' || suffix === '_not_in') {
-        const op = suffix === '_in' ? 'IN' : 'NOT IN';
-        const placeholders = value.map(() => '?').join(', ');
-        return { sql: `${sub} ${op} (${placeholders})`, bindings: value };
-      }
+        return currentQuery.where(expr, likeOps[suffix], `%${value}%`);
+      if (suffix === '_in') return currentQuery.where(expr, 'in', value);
+      if (suffix === '_not_in')
+        return currentQuery.where(expr, 'not in', value);
       return null;
     };
 
@@ -149,13 +149,14 @@ export async function queryMulti(
       for (const [name, config] of Object.entries(entityComputedResolvers)) {
         if (!w[0].startsWith(name)) continue;
         const suffix = w[0].slice(name.length);
-        const built = buildComputedWhere(
-          `(${config.sql(knex).toQuery()})`,
+        const applied = applyComputedWhere(
+          query,
+          config.sql(knex),
           suffix,
           w[1]
         );
-        if (built) {
-          query = query.whereRaw(built.sql, built.bindings);
+        if (applied) {
+          query = applied;
           return;
         }
       }
