@@ -169,7 +169,7 @@ export class GqlEntityController {
 
             if (itemType instanceof GraphQLObjectType) {
               resolvers[field.name] = getNestedResolver(
-                multiEntityQueryName(itemType)
+                singleEntityQueryName(itemType)
               );
             }
           }

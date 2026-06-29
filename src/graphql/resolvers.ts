@@ -394,7 +394,7 @@ export async function querySingle(
 }
 
 export const getNestedResolver =
-  (columnName: string) =>
+  (entityName: string) =>
   async (
     parent: Result,
     args: unknown,
@@ -429,7 +429,7 @@ export const getNestedResolver =
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
       const loaderResult = await getLoader(
-        columnName,
+        entityName,
         'id',
         queryFilter
       ).loadMany(parent[info.fieldName]);
@@ -449,7 +449,7 @@ export const getNestedResolver =
       }
 
       result = await getLoader(
-        columnName,
+        entityName,
         fieldArgument.value.value,
         queryFilter
       ).load(parent.id);
