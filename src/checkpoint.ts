@@ -8,7 +8,12 @@ import { createPgPool } from './pg';
 import { BaseIndexer } from './providers';
 import { register } from './register';
 import { checkpointConfigSchema } from './schemas';
-import { CheckpointsStore } from './stores/checkpoints';
+import {
+  CheckpointsStore,
+  GLOBAL_INDEXER,
+  METADATA_VALUE_MAX_LENGTH,
+  MetadataId
+} from './stores/checkpoints';
 import { CheckpointConfig, CheckpointOptions } from './types';
 import { extendSchema } from './utils/graphql';
 import { createLogger, Logger, LogLevel } from './utils/logger';
@@ -171,6 +176,75 @@ export default class Checkpoint {
     for (const container of this.containers.values()) {
       await container.resetMetadata();
     }
+  }
+
+  /**
+   * Resets Checkpoint (metadata and all indexed entities) only when the
+   * provided application version tag differs from the one stored on a previous
+   * run.
+   *
+   * Use this to automatically reset the database when your application changes
+   * in ways Checkpoint can't detect on its own through `resetOnConfigChange`,
+   * such as changes to writer logic, feature flags, or which indexers are
+   * registered. The version tag is an opaque string you control, typically
+   * derived from a git commit hash combined with any flags that affect
+   * indexing. It is stored as-is and must be at most
+   * `METADATA_VALUE_MAX_LENGTH` characters long.
+   *
+   * If no version tag is provided, this always resets. This is a safe default
+   * for environments without version tracking.
+   *
+   * This should be called before `start()`.
+   *
+   * Returns true if a reset was performed, false otherwise.
+   *
+   */
+  public async syncVersion(versionTag?: string): Promise<boolean> {
+    await this.store.createStore();
+
+    if (!versionTag) {
+      this.log.info('no version tag provided, resetting');
+
+      await this.resetMetadata();
+      await this.reset();
+
+      return true;
+    }
+
+    if (versionTag.length > METADATA_VALUE_MAX_LENGTH) {
+      throw new Error(
+        `versionTag must be at most ${METADATA_VALUE_MAX_LENGTH} characters long`
+      );
+    }
+
+    const storedVersionTag = await this.store.getMetadata(
+      GLOBAL_INDEXER,
+      MetadataId.VersionTag
+    );
+
+    if (storedVersionTag === versionTag) {
+      this.log.info({ versionTag }, 'version tag unchanged, continuing');
+
+      return false;
+    }
+
+    this.log.info(
+      { versionTag, storedVersionTag },
+      storedVersionTag
+        ? 'version tag changed, resetting'
+        : 'no stored version tag, resetting'
+    );
+
+    await this.resetMetadata();
+    await this.reset();
+
+    await this.store.setMetadata(
+      GLOBAL_INDEXER,
+      MetadataId.VersionTag,
+      versionTag
+    );
+
+    return true;
   }
 
   /**

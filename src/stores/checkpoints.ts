@@ -54,10 +54,19 @@ export enum MetadataId {
   NetworkIdentifier = 'network_identifier',
   StartBlock = 'start_block',
   ConfigChecksum = 'config_checksum',
-  SchemaVersion = 'schema_version'
+  SchemaVersion = 'schema_version',
+  VersionTag = 'version_tag'
 }
 
+/**
+ * Indexer name used to store metadata that is not tied to a single indexer,
+ * such as the application version tag.
+ */
+export const GLOBAL_INDEXER = '_global';
+
 export const INTERNAL_TABLES = Object.values(Table);
+
+export const METADATA_VALUE_MAX_LENGTH = 128;
 
 const CheckpointIdSize = 10;
 
@@ -133,7 +142,10 @@ export class CheckpointsStore {
       builder = builder.createTable(Table.Metadata, t => {
         t.string(Fields.Metadata.Id, 20);
         t.string(Fields.Metadata.Indexer).notNullable();
-        t.string(Fields.Metadata.Value, 128).notNullable();
+        t.string(
+          Fields.Metadata.Value,
+          METADATA_VALUE_MAX_LENGTH
+        ).notNullable();
         t.primary([Fields.Metadata.Id, Fields.Metadata.Indexer]);
       });
     }
