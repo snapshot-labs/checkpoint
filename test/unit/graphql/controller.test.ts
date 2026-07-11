@@ -22,6 +22,29 @@ type Vote {
       expect(schema).toMatchSnapshot();
     });
 
+    it('should expose enum fields as String in where inputs', () => {
+      const controller = new GqlEntityController(`
+type Proposal {
+  id: Int!
+  state: ProposalState!
+}
+
+enum ProposalState {
+  pending
+  active
+  closed
+}
+  `);
+      const queryFields = controller.generateQueryFields();
+      const querySchema = new GraphQLObjectType({
+        name: 'Query',
+        fields: queryFields
+      });
+
+      const schema = printSchema(new GraphQLSchema({ query: querySchema }));
+      expect(schema).toMatchSnapshot();
+    });
+
     // list of error table tests
     describe.each([
       {

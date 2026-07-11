@@ -17,6 +17,49 @@ create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
 create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 `;
 
+exports[`GqlEntityController generateQueryFields should expose enum fields as String in where inputs 1`] = `
+"type Query {
+  proposal(id: Int!, indexer: String, block: Int): Proposal
+  proposals(first: Int, skip: Int, orderBy: Proposal_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Proposal_filter): [Proposal!]!
+}
+
+type Proposal {
+  id: Int!
+  state: ProposalState!
+}
+
+enum ProposalState {
+  pending
+  active
+  closed
+}
+
+enum Proposal_orderBy {
+  id
+  state
+}
+
+enum OrderDirection {
+  asc
+  desc
+}
+
+input Proposal_filter {
+  id_gt: Int
+  id_gte: Int
+  id_lt: Int
+  id_lte: Int
+  id: Int
+  id_not: Int
+  id_in: [Int]
+  id_not_in: [Int]
+  state: String
+  state_not: String
+  state_in: [String]
+  state_not_in: [String]
+}"
+`;
+
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!, indexer: String, block: Int): Vote

@@ -483,15 +483,20 @@ export class GqlEntityController {
         }
 
         if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
-          whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
+          const filterType =
+            nonNullFieldType instanceof GraphQLEnumType
+              ? GraphQLString
+              : nonNullFieldType;
+
+          whereInputConfig.fields[`${field.name}`] = { type: filterType };
           whereInputConfig.fields[`${field.name}_not`] = {
-            type: nonNullFieldType
+            type: filterType
           };
           whereInputConfig.fields[`${field.name}_in`] = {
-            type: new GraphQLList(nonNullFieldType)
+            type: new GraphQLList(filterType)
           };
           whereInputConfig.fields[`${field.name}_not_in`] = {
-            type: new GraphQLList(nonNullFieldType)
+            type: new GraphQLList(filterType)
           };
         }
 
