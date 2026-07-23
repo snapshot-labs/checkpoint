@@ -1,17 +1,11 @@
-import { mockDeep } from 'jest-mock-extended';
+import { afterAll, describe, expect, it } from 'bun:test';
 import knex from 'knex';
 import {
   CheckpointsStore,
   MetadataId,
   Table
 } from '../../../src/stores/checkpoints';
-import { Logger } from '../../../src/utils/logger';
-
-function createMockLogger() {
-  return mockDeep<Logger>({
-    child: () => createMockLogger()
-  });
-}
+import { createLogger } from '../../../src/utils/logger';
 
 describe('CheckpointsStore', () => {
   const INDEXER = 'default';
@@ -24,7 +18,7 @@ describe('CheckpointsStore', () => {
     useNullAsDefault: true
   });
 
-  const logger = createMockLogger();
+  const logger = createLogger({ level: 'silent' });
   const store = new CheckpointsStore(mockKnex, logger);
 
   afterAll(async () => {

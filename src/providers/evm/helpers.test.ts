@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import { getRangeHint } from './helpers';
 import { CustomJsonRpcError } from './types';
 

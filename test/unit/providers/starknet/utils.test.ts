@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import {
   factoryAbiCairo1,
   spaceAbi,

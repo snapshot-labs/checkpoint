@@ -232,3 +232,9 @@ query {
     }
 }"
 `;
+
+exports[`GqlEntityController generateQueryFields should fail for non null object id 1`] = `"'id' field for type Vote must be non nullable."`;
+
+exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 1`] = `"'id' field for type Vote is not a scalar type."`;
+
+exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 2 1`] = `"'id' field for type Participant is not a scalar type."`;

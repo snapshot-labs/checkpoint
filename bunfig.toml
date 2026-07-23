@@ -1,0 +1,4 @@
+[test]
+coverage = true
+coverageDir = "coverage"
+coveragePathIgnorePatterns = ["node_modules", "dist", "test/fixtures"]

@@ -13,11 +13,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '22'
-          cache: 'yarn'
-      - run: yarn install
-      - run: yarn lint
-      - run: yarn build
-      - run: yarn test
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run lint
+      - run: bun run build
+      - run: bun run test

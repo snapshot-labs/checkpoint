@@ -28,4 +28,4 @@ export const createLogger = (opts: LoggerOptions = {}): Logger => {
 };
 
 // re-export types as it is.
-export { Logger, LoggerOptions };
+export type { Logger, LoggerOptions };

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import { chunk } from '../../../src/utils/helpers';
 
 describe('chunk', () => {

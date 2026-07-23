@@ -1,3 +1,4 @@
+import { afterAll, describe, expect, it } from 'bun:test';
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
@@ -23,7 +24,7 @@ type Vote {
     });
 
     // list of error table tests
-    describe.each([
+    it.each([
       {
         reason: 'non null object id',
         schema: `type Vote { id: String }`

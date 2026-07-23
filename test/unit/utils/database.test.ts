@@ -1,3 +1,4 @@
+import { afterAll, describe, expect, it } from 'bun:test';
 import knex from 'knex';
 import { applyQueryFilter, getTableName } from '../../../src/utils/database';
 

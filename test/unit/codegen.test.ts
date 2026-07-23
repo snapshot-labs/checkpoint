@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import { buildSchema, GraphQLObjectType } from 'graphql';
 import {
   codegen,
