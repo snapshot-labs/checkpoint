@@ -23,11 +23,11 @@ import {
   Source
 } from 'graphql';
 import { Knex } from 'knex';
-import pluralize from 'pluralize';
 import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
 import { KnexType } from '../knex';
 import { OverridesConfig } from '../types';
 import { getNestedResolver, queryMulti, querySingle } from './resolvers';
+import { getTableName } from '../utils/database';
 import {
   generateQueryForEntity,
   getComputedDirective,
@@ -232,7 +232,7 @@ export class GqlEntityController {
     }
 
     this.schemaObjects.map(type => {
-      const tableName = pluralize(type.name.toLowerCase());
+      const tableName = getTableName(type.name.toLowerCase());
 
       builder = builder
         .dropTableIfExists(tableName)

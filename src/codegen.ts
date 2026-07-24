@@ -11,13 +11,13 @@ import {
   GraphQLType,
   isListType
 } from 'graphql';
-import pluralize from 'pluralize';
 import {
   DecimalTypes,
   DEFAULT_DECIMAL_TYPES,
   GqlEntityController
 } from './graphql/controller';
 import { OverridesConfig } from './types';
+import { getTableName } from './utils/database';
 import { getComputedDirective, getDerivedFromDirective } from './utils/graphql';
 
 type TypeInfo = {
@@ -122,7 +122,7 @@ export const codegen = (
     const modelName = type.name;
 
     contents += `export class ${modelName} extends Model {\n`;
-    contents += `  static tableName = '${pluralize(modelName.toLowerCase())}';\n\n`;
+    contents += `  static tableName = '${getTableName(modelName.toLowerCase())}';\n\n`;
 
     const typeFields = controller.getTypeFields(type);
     const idField = typeFields.find(field => field.name === 'id');
