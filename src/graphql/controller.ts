@@ -416,9 +416,7 @@ export class GqlEntityController {
         if (isListType(nonNullFieldType)) {
           const itemType = nonNullFieldType.ofType;
 
-          if (!isLeafType(itemType)) {
-            return;
-          }
+          if (!isLeafType(itemType)) return;
 
           whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
           whereInputConfig.fields[`${field.name}_not`] = {
@@ -437,23 +435,16 @@ export class GqlEntityController {
           }
         }
 
-        // avoid setting up where filters for non scalar types
-        if (!isLeafType(nonNullFieldType)) {
-          return;
-        }
+        if (!isLeafType(nonNullFieldType)) return;
 
-        if (nonNullFieldType === GraphQLInt) {
-          whereInputConfig.fields[`${field.name}_gt`] = { type: GraphQLInt };
-          whereInputConfig.fields[`${field.name}_gte`] = { type: GraphQLInt };
-          whereInputConfig.fields[`${field.name}_lt`] = { type: GraphQLInt };
-          whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
-        }
-
-        if (
+        const isNumericType =
+          nonNullFieldType === GraphQLInt ||
+          nonNullFieldType === GraphQLFloat ||
           (nonNullFieldType instanceof GraphQLScalarType &&
             nonNullFieldType.name === 'BigInt') ||
-          this.decimalTypes[nonNullFieldType.name]
-        ) {
+          this.decimalTypes[nonNullFieldType.name];
+
+        if (isNumericType) {
           whereInputConfig.fields[`${field.name}_gt`] = {
             type: nonNullFieldType
           };
@@ -470,7 +461,7 @@ export class GqlEntityController {
 
         if (
           nonNullFieldType === GraphQLString ||
-          (nonNullFieldType as GraphQLScalarType).name === 'Text'
+          nonNullFieldType.name === 'Text'
         ) {
           whereInputConfig.fields[`${field.name}_contains`] = {
             type: GraphQLString
@@ -486,7 +477,7 @@ export class GqlEntityController {
           };
         }
 
-        if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
+        if (nonNullFieldType.name !== 'Text') {
           whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
           whereInputConfig.fields[`${field.name}_not`] = {
             type: nonNullFieldType
