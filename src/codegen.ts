@@ -12,26 +12,17 @@ import {
   isListType
 } from 'graphql';
 import pluralize from 'pluralize';
-import { GqlEntityController } from './graphql/controller';
+import {
+  DecimalTypes,
+  DEFAULT_DECIMAL_TYPES,
+  GqlEntityController
+} from './graphql/controller';
 import { OverridesConfig } from './types';
 import { getComputedDirective, getDerivedFromDirective } from './utils/graphql';
 
 type TypeInfo = {
   type: string;
   initialValue: any;
-};
-
-type DecimalTypes = NonNullable<OverridesConfig['decimal_types']>;
-
-const DEFAULT_DECIMAL_TYPES = {
-  Decimal: {
-    p: 10,
-    d: 2
-  },
-  BigDecimal: {
-    p: 20,
-    d: 8
-  }
 };
 
 export const getTypeInfo = (

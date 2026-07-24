@@ -60,6 +60,19 @@ type WhereResult = {
   orderByValues: Record<string, { value: string }>;
 };
 
+export type DecimalTypes = NonNullable<OverridesConfig['decimal_types']>;
+
+export const DEFAULT_DECIMAL_TYPES: DecimalTypes = {
+  Decimal: {
+    p: 10,
+    d: 2
+  },
+  BigDecimal: {
+    p: 20,
+    d: 8
+  }
+};
+
 /**
  * Controller for performing actions based on the graphql schema provided to its
  * constructor. It exposes public functions to generate graphql or database
@@ -70,21 +83,12 @@ type WhereResult = {
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
-  private readonly decimalTypes: NonNullable<OverridesConfig['decimal_types']>;
+  private readonly decimalTypes: DecimalTypes;
   private _schemaObjects?: GraphQLObjectType[];
 
   constructor(typeDefs: string | Source, config?: OverridesConfig) {
     this.schema = buildSchema(typeDefs);
-    this.decimalTypes = config?.decimal_types || {
-      Decimal: {
-        p: 10,
-        d: 2
-      },
-      BigDecimal: {
-        p: 20,
-        d: 8
-      }
-    };
+    this.decimalTypes = config?.decimal_types || DEFAULT_DECIMAL_TYPES;
   }
 
   /**
