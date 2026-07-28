@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
 import { GqlEntityController } from './graphql/controller';
+import { EntityBuffer } from './orm/entity-buffer';
 import {
   BaseIndexer,
   BlockNotFoundError,
@@ -35,6 +36,12 @@ const CHECK_LATEST_BLOCK_INTERVAL = 50;
 
 const DEFAULT_FETCH_INTERVAL = 2000;
 
+/** Maximum time buffered writes are held before a flush is forced. */
+const FLUSH_INTERVAL = 60 * 1000;
+
+/** Maximum entity buffer size before a flush is forced. */
+const MAX_BUFFER_SIZE = 10000;
+
 export class Container implements Instance {
   private indexerName: string;
 
@@ -51,12 +58,14 @@ export class Container implements Instance {
   private activeTemplates: TemplateSource[] = [];
   private cpBlocksCache: number[] | null = [];
   private blockHashCache: { blockNumber: number; hash: string } | null = null;
+  private entityBuffer: EntityBuffer;
 
   private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
 
   private lastPurgeBlock: number | null = null;
+  private lastFlushAt = Date.now();
 
   constructor(
     indexerName: string,
@@ -70,6 +79,8 @@ export class Container implements Instance {
     opts?: CheckpointOptions
   ) {
     this.indexerName = indexerName;
+    this.entityBuffer = register.getEntityBuffer(indexerName);
+    this.entityBuffer.reset();
     this.log = log.child({ component: 'container', indexer: indexerName });
     this.knex = knex;
     this.store = store;
@@ -126,7 +137,10 @@ export class Container implements Instance {
       return this.blockHashCache.hash;
     }
 
-    return this.store.getBlockHash(this.indexerName, blockNumber);
+    return (
+      this.entityBuffer.getBlockHash(blockNumber) ??
+      this.store.getBlockHash(this.indexerName, blockNumber)
+    );
   }
 
   private addSource(source: ContractSourceConfig) {
@@ -188,19 +202,15 @@ export class Container implements Instance {
   public async setBlockHash(blockNum: number, hash: string) {
     this.blockHashCache = { blockNumber: blockNum, hash };
 
-    return this.store.setBlockHash(this.indexerName, blockNum, hash);
+    this.entityBuffer.setBlockHash(blockNum, hash);
   }
 
   public async setLastIndexedBlock(block: number) {
-    await this.store.setMetadata(
-      this.indexerName,
-      MetadataId.LastIndexedBlock,
-      block
-    );
+    this.entityBuffer.setLastIndexedBlock(block);
   }
 
   public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
-    await this.store.insertCheckpoints(this.indexerName, checkpoints);
+    this.entityBuffer.addCheckpoints(checkpoints);
   }
 
   /**
@@ -351,12 +361,15 @@ export class Container implements Instance {
 
       try {
         register.setCurrentBlock(this.indexerName, BigInt(blockNumber));
+        this.entityBuffer.beginBlock();
 
         const initialSources = this.getCurrentSources(blockNumber);
         const parentHash = await this.getBlockHash(blockNumber - 1);
         const nextBlockNumber = await this.indexer
           .getProvider()
           .processBlock(blockNumber, parentHash);
+        this.entityBuffer.commitBlock();
+
         const sources = this.getCurrentSources(nextBlockNumber);
 
         if (initialSources.length !== sources.length) {
@@ -364,24 +377,18 @@ export class Container implements Instance {
         }
 
         blockNumber = nextBlockNumber;
-
-        if (this.config.state_retention_blocks) {
-          if (this.lastPurgeBlock === null) {
-            this.lastPurgeBlock = blockNumber;
-          } else if (
-            blockNumber - this.lastPurgeBlock >=
-            this.config.state_retention_blocks
-          ) {
-            await this.purgeOldState(blockNumber);
-            this.lastPurgeBlock = blockNumber;
-          }
-        }
       } catch (err) {
+        this.entityBuffer.rollbackBlock();
+
         if (err instanceof BlockNotFoundError) {
           if (this.config.optimistic_indexing) {
             try {
+              this.entityBuffer.beginBlock();
               await this.indexer.getProvider().processPool(blockNumber);
+              this.entityBuffer.commitBlock();
+              await this.flushBuffer(blockNumber);
             } catch (err) {
+              this.entityBuffer.rollbackBlock();
               this.log.error(
                 { blockNumber: blockNumber, err },
                 'error occurred during pool processing'
@@ -409,7 +416,50 @@ export class Container implements Instance {
         }
 
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
+        continue;
       }
+
+      await this.maybeFlush(blockNumber);
+    }
+  }
+
+  private async flushBuffer(currentBlock: number) {
+    while (true) {
+      try {
+        await this.entityBuffer.flush();
+        this.lastFlushAt = Date.now();
+
+        break;
+      } catch (err) {
+        this.log.error({ err }, 'flush failed, retrying');
+        await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
+      }
+    }
+
+    if (!this.config.state_retention_blocks) return;
+
+    try {
+      if (this.lastPurgeBlock === null) {
+        this.lastPurgeBlock = currentBlock;
+      } else if (
+        currentBlock - this.lastPurgeBlock >=
+        this.config.state_retention_blocks
+      ) {
+        await this.purgeOldState(currentBlock);
+        this.lastPurgeBlock = currentBlock;
+      }
+    } catch (err) {
+      this.log.error({ err }, 'purging old state failed');
+    }
+  }
+
+  private async maybeFlush(currentBlock: number) {
+    const atTip = currentBlock > this.preloadEndBlock;
+    const stale = Date.now() - this.lastFlushAt >= FLUSH_INTERVAL;
+    const full = this.entityBuffer.size >= MAX_BUFFER_SIZE;
+
+    if (atTip || stale || full) {
+      await this.flushBuffer(currentBlock);
     }
   }
 
@@ -438,6 +488,8 @@ export class Container implements Instance {
   private async handleReorg(blockNumber: number) {
     this.log.info({ blockNumber }, 'handling reorg');
 
+    await this.flushBuffer(blockNumber);
+
     let current = blockNumber - 1;
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
@@ -464,7 +516,7 @@ export class Container implements Instance {
       }
     }
 
-    const entities = await this.entityController.schemaObjects;
+    const entities = this.entityController.schemaObjects;
     const tables = entities.map(entity =>
       getTableName(entity.name.toLowerCase())
     );
@@ -490,6 +542,7 @@ export class Container implements Instance {
     // TODO: when we have full transaction support, we should include this in the transaction
     await this.store.removeFutureData(this.indexerName, lastGoodBlock);
 
+    this.entityBuffer.reset();
     this.cpBlocksCache = null;
     this.blockHashCache = null;
 
@@ -499,6 +552,8 @@ export class Container implements Instance {
   }
 
   public async reset() {
+    this.entityBuffer.reset();
+
     await this.store.setMetadata(
       this.indexerName,
       MetadataId.LastIndexedBlock,

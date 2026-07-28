@@ -182,7 +182,12 @@ export class StarknetProvider extends BaseProvider {
         eventsData.isPreloaded,
         eventsData.events[txId] || []
       );
+    }
 
+    // Marked only after the whole pool run succeeded: on failure the
+    // container rolls back all buffered pool writes, so already-handled
+    // transactions must be re-processed by the next pool cycle.
+    for (const txId of txIds) {
       this.seenPoolTransactions.add(txId);
     }
 
