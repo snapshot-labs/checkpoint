@@ -15,7 +15,11 @@ describe('createKnexConfig', () => {
         password: 'default_password',
         port: 3306,
         ssl: undefined,
-        user: 'root'
+        user: 'root',
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10_000,
+        connectionTimeoutMillis: 30_000,
+        query_timeout: 60_000
       }
     });
   });

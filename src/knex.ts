@@ -70,7 +70,11 @@ export function getConnectionData(connectionString: string) {
       password: connectionConfig.password,
       host: connectionConfig.hosts[0].name,
       port: connectionConfig.hosts[0].port,
-      ssl: Object.keys(sslConfig).length > 0 ? sslConfig : undefined
+      ssl: Object.keys(sslConfig).length > 0 ? sslConfig : undefined,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      connectionTimeoutMillis: 30_000,
+      query_timeout: 60_000
     }
   };
 }
