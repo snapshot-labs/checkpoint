@@ -42,6 +42,9 @@ const FLUSH_INTERVAL = 60 * 1000;
 /** Maximum entity buffer size before a flush is forced. */
 const MAX_BUFFER_SIZE = 10000;
 
+/** Maximum delay between flush retries when backing off. */
+const MAX_FLUSH_RETRY_DELAY = 60 * 1000;
+
 export class Container implements Instance {
   private indexerName: string;
 
@@ -424,6 +427,7 @@ export class Container implements Instance {
   }
 
   private async flushBuffer(currentBlock: number) {
+    let retryDelay = this.config.fetch_interval || DEFAULT_FETCH_INTERVAL;
     while (true) {
       try {
         await this.entityBuffer.flush();
@@ -431,8 +435,12 @@ export class Container implements Instance {
 
         break;
       } catch (err) {
-        this.log.error({ err }, 'flush failed, retrying');
-        await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
+        this.log.error(
+          { err, currentBlock, bufferSize: this.entityBuffer.size },
+          'flush failed, retrying'
+        );
+        await sleep(retryDelay);
+        retryDelay = Math.min(retryDelay * 2, MAX_FLUSH_RETRY_DELAY);
       }
     }
 
