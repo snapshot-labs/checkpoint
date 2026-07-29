@@ -45,7 +45,7 @@ export const getTypeInfo = (
   if (type instanceof GraphQLScalarType) {
     switch (type.name) {
       case 'BigInt':
-        return { type: 'bigint', initialValue: 0 };
+        return { type: 'bigint', initialValue: 0n };
       case 'Boolean':
         return { type: 'boolean', initialValue: false };
       case 'Text':
@@ -107,6 +107,19 @@ export const getJSType = (
   return { isNullable, isList, baseType };
 };
 
+const isPersistedField = (field: GraphQLField<any, any>) => {
+  if (getComputedDirective(field)) return false;
+
+  const fieldType =
+    field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+
+  return !(
+    isListType(fieldType) &&
+    fieldType.ofType instanceof GraphQLObjectType &&
+    getDerivedFromDirective(field)
+  );
+};
+
 export const codegen = (
   controller: GqlEntityController,
   config: OverridesConfig,
@@ -121,10 +134,8 @@ export const codegen = (
   controller.schemaObjects.forEach((type, i, arr) => {
     const modelName = type.name;
 
-    contents += `export class ${modelName} extends Model {\n`;
-    contents += `  static tableName = '${getTableName(modelName.toLowerCase())}';\n\n`;
-
     const typeFields = controller.getTypeFields(type);
+    const persistedFields = typeFields.filter(isPersistedField);
     const idField = typeFields.find(field => field.name === 'id');
     const idType = idField ? getJSType(idField, decimalTypes) : null;
 
@@ -139,27 +150,23 @@ export const codegen = (
       );
     }
 
+    contents += `export class ${modelName} extends Model {\n`;
+    contents += `  static tableName = '${getTableName(modelName.toLowerCase())}';\n\n`;
+    contents += `  static fieldNames = [${persistedFields.map(field => `'${field.name}'`).join(', ')}];\n\n`;
+
     contents +=
       format === 'javascript'
         ? `  constructor(id, indexerName) {\n`
         : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
     contents += `    super(${modelName}.tableName, indexerName);\n\n`;
-    typeFields.forEach(field => {
-      if (getComputedDirective(field)) return;
-
-      const fieldType =
-        field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-      if (
-        isListType(fieldType) &&
-        fieldType.ofType instanceof GraphQLObjectType &&
-        getDerivedFromDirective(field)
-      ) {
-        return;
-      }
-
+    persistedFields.forEach(field => {
       const rawInitialValue = getInitialValue(field.type, decimalTypes);
       const initialValue =
-        field.name === 'id' ? 'id' : JSON.stringify(rawInitialValue);
+        field.name === 'id'
+          ? 'id'
+          : typeof rawInitialValue === 'bigint'
+            ? `${rawInitialValue}n`
+            : JSON.stringify(rawInitialValue);
       contents += `    this.initialSet('${field.name}', ${initialValue});\n`;
     });
     contents += `  }\n\n`;
@@ -172,7 +179,7 @@ export const codegen = (
     contents += `    if (!entity) return null;\n\n`;
     contents += `    const model = new ${modelName}(id, indexerName);\n`;
     contents += `    model.setExists();\n\n`;
-    contents += `    for (const key in entity) {\n`;
+    contents += `    for (const key of ${modelName}.fieldNames) {\n`;
     contents += `      const value = entity[key] !== null && typeof entity[key] === 'object'\n`;
     contents += `        ? JSON.stringify(entity[key])\n`;
     contents += `        : entity[key];\n`;
@@ -181,38 +188,42 @@ export const codegen = (
     contents += `    return model;\n`;
     contents += `  }\n\n`;
 
-    typeFields.forEach(field => {
-      if (getComputedDirective(field)) return;
-
-      const fieldType =
-        field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-      if (
-        isListType(fieldType) &&
-        fieldType.ofType instanceof GraphQLObjectType &&
-        getDerivedFromDirective(field)
-      ) {
-        return;
-      }
-
+    persistedFields.forEach(field => {
       const { isNullable, isList, baseType } = getJSType(field, decimalTypes);
       const typeAnnotation = isNullable ? `${baseType} | null` : baseType;
+      const isBigInt = baseType === 'bigint';
 
       contents +=
         format === 'javascript'
           ? `  get ${field.name}() {\n`
           : `  get ${field.name}(): ${typeAnnotation} {\n`;
-      contents += `    return ${
-        isList
-          ? `JSON.parse(this.get('${field.name}'))`
-          : `this.get('${field.name}')`
-      };\n`;
+      if (isBigInt && isNullable) {
+        contents += `    const value = this.get('${field.name}');\n`;
+        contents += `    return value === null ? null : BigInt(value);\n`;
+      } else {
+        let getterExpression = `this.get('${field.name}')`;
+        if (isList) getterExpression = `JSON.parse(${getterExpression})`;
+        if (isBigInt) getterExpression = `BigInt(${getterExpression})`;
+        contents += `    return ${getterExpression};\n`;
+      }
       contents += `  }\n\n`;
+
+      const setterAnnotation = isBigInt
+        ? `bigint | number | string${isNullable ? ' | null' : ''}`
+        : typeAnnotation;
+      let setterExpression = 'value';
+      if (isList) setterExpression = 'JSON.stringify(value)';
+      if (isBigInt) {
+        setterExpression = isNullable
+          ? 'value === null ? null : BigInt(value)'
+          : 'BigInt(value)';
+      }
 
       contents +=
         format === 'javascript'
           ? `  set ${field.name}(value) {\n`
-          : `  set ${field.name}(value: ${typeAnnotation}) {\n`;
-      contents += `    this.set('${field.name}', ${isList ? `JSON.stringify(value)` : 'value'});\n`;
+          : `  set ${field.name}(value: ${setterAnnotation}) {\n`;
+      contents += `    this.set('${field.name}', ${setterExpression});\n`;
       contents += `  }\n\n`;
     });
 
