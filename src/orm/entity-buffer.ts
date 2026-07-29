@@ -262,7 +262,7 @@ export class EntityBuffer {
 
     for (const entity of this.entities.values()) {
       if (entity.closeDatabaseRowAt !== null) {
-        const key = `${entity.tableName} ${entity.closeDatabaseRowAt}`;
+        const key = `${entity.tableName}\u0000${entity.closeDatabaseRowAt}`;
         const group = closes.get(key) ?? {
           tableName: entity.tableName,
           closeAt: entity.closeDatabaseRowAt,
@@ -408,7 +408,7 @@ export class EntityBuffer {
   }
 
   private getKey(tableName: string, id: string): string {
-    return `${tableName} ${id}`;
+    return `${tableName}\u0000${id}`;
   }
 
   private touch(
