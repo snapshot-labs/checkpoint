@@ -9,10 +9,5 @@ import { getConnectionData } from './knex';
 export const createPgPool = (connectionString: string): Pool => {
   const { connection } = getConnectionData(connectionString);
 
-  const config = {
-    ...connection,
-    connectionTimeoutMillis: 30000 // 30 seconds
-  };
-
-  return new Pool(config);
+  return new Pool(connection);
 };
