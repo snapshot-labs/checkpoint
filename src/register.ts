@@ -1,8 +1,18 @@
 import { Knex } from 'knex';
+import { EntityBuffer } from './orm/entity-buffer';
 
 function createRegister() {
   let knexInstance: Knex | null = null;
   const currentBlocks = new Map<string, bigint>();
+  const entityBuffers = new Map<string, EntityBuffer>();
+
+  const getKnex = () => {
+    if (!knexInstance) {
+      throw new Error('Knex is not initialized yet.');
+    }
+
+    return knexInstance;
+  };
 
   return {
     getCurrentBlock(indexerName: string) {
@@ -11,13 +21,16 @@ function createRegister() {
     setCurrentBlock(indexerName: string, block: bigint) {
       currentBlocks.set(indexerName, block);
     },
-    getKnex() {
-      if (!knexInstance) {
-        throw new Error('Knex is not initialized yet.');
+    getEntityBuffer(indexerName: string) {
+      let buffer = entityBuffers.get(indexerName);
+      if (!buffer) {
+        buffer = new EntityBuffer({ indexerName, getKnex });
+        entityBuffers.set(indexerName, buffer);
       }
 
-      return knexInstance;
+      return buffer;
     },
+    getKnex,
     setKnex(knex: Knex) {
       knexInstance = knex;
     }

@@ -1,229 +1,12 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`codegen should generate javascript code 1`] = `
-"import { Model } from '@snapshot-labs/checkpoint';
-
-export class Space extends Model {
-  static tableName = 'spaces';
-
-  constructor(id, indexerName) {
-    super(Space.tableName, indexerName);
-
-    this.initialSet('id', id);
-    this.initialSet('name', null);
-    this.initialSet('about', null);
-    this.initialSet('controller', "");
-    this.initialSet('voting_delay', 0);
-    this.initialSet('proposal_threshold', 0);
-    this.initialSet('quorum', 0);
-    this.initialSet('strategies', "[]");
-    this.initialSet('strategies_nonnull', "[]");
-    this.initialSet('_indexer', "");
-  }
-
-  static async loadEntity(id, indexerName) {
-    const entity = await super._loadEntity(Space.tableName, id, indexerName);
-    if (!entity) return null;
-
-    const model = new Space(id, indexerName);
-    model.setExists();
-
-    for (const key in entity) {
-      const value = entity[key] !== null && typeof entity[key] === 'object'
-        ? JSON.stringify(entity[key])
-        : entity[key];
-      model.set(key, value);
-    }
-
-    return model;
-  }
-
-  get id() {
-    return this.get('id');
-  }
-
-  set id(value) {
-    this.set('id', value);
-  }
-
-  get name() {
-    return this.get('name');
-  }
-
-  set name(value) {
-    this.set('name', value);
-  }
-
-  get about() {
-    return this.get('about');
-  }
-
-  set about(value) {
-    this.set('about', value);
-  }
-
-  get controller() {
-    return this.get('controller');
-  }
-
-  set controller(value) {
-    this.set('controller', value);
-  }
-
-  get voting_delay() {
-    return this.get('voting_delay');
-  }
-
-  set voting_delay(value) {
-    this.set('voting_delay', value);
-  }
-
-  get proposal_threshold() {
-    return this.get('proposal_threshold');
-  }
-
-  set proposal_threshold(value) {
-    this.set('proposal_threshold', value);
-  }
-
-  get quorum() {
-    return this.get('quorum');
-  }
-
-  set quorum(value) {
-    this.set('quorum', value);
-  }
-
-  get strategies() {
-    return JSON.parse(this.get('strategies'));
-  }
-
-  set strategies(value) {
-    this.set('strategies', JSON.stringify(value));
-  }
-
-  get strategies_nonnull() {
-    return JSON.parse(this.get('strategies_nonnull'));
-  }
-
-  set strategies_nonnull(value) {
-    this.set('strategies_nonnull', JSON.stringify(value));
-  }
-
-  get _indexer() {
-    return this.get('_indexer');
-  }
-
-  set _indexer(value) {
-    this.set('_indexer', value);
-  }
-}
-
-export class Proposal extends Model {
-  static tableName = 'proposals';
-
-  constructor(id, indexerName) {
-    super(Proposal.tableName, indexerName);
-
-    this.initialSet('id', id);
-    this.initialSet('proposal_id', 0);
-    this.initialSet('space', "");
-    this.initialSet('title', "");
-    this.initialSet('scores_total', 0);
-    this.initialSet('active', false);
-    this.initialSet('progress', "0");
-    this.initialSet('_indexer', "");
-  }
-
-  static async loadEntity(id, indexerName) {
-    const entity = await super._loadEntity(Proposal.tableName, id, indexerName);
-    if (!entity) return null;
-
-    const model = new Proposal(id, indexerName);
-    model.setExists();
-
-    for (const key in entity) {
-      const value = entity[key] !== null && typeof entity[key] === 'object'
-        ? JSON.stringify(entity[key])
-        : entity[key];
-      model.set(key, value);
-    }
-
-    return model;
-  }
-
-  get id() {
-    return this.get('id');
-  }
-
-  set id(value) {
-    this.set('id', value);
-  }
-
-  get proposal_id() {
-    return this.get('proposal_id');
-  }
-
-  set proposal_id(value) {
-    this.set('proposal_id', value);
-  }
-
-  get space() {
-    return this.get('space');
-  }
-
-  set space(value) {
-    this.set('space', value);
-  }
-
-  get title() {
-    return this.get('title');
-  }
-
-  set title(value) {
-    this.set('title', value);
-  }
-
-  get scores_total() {
-    return this.get('scores_total');
-  }
-
-  set scores_total(value) {
-    this.set('scores_total', value);
-  }
-
-  get active() {
-    return this.get('active');
-  }
-
-  set active(value) {
-    this.set('active', value);
-  }
-
-  get progress() {
-    return this.get('progress');
-  }
-
-  set progress(value) {
-    this.set('progress', value);
-  }
-
-  get _indexer() {
-    return this.get('_indexer');
-  }
-
-  set _indexer(value) {
-    this.set('_indexer', value);
-  }
-}
-"
-`;
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`codegen should generate typescript code 1`] = `
 "import { Model } from '@snapshot-labs/checkpoint';
 
 export class Space extends Model {
   static tableName = 'spaces';
+
+  static fieldNames = ['id', 'name', 'about', 'controller', 'voting_delay', 'proposal_threshold', 'quorum', 'strategies', 'strategies_nonnull', '_indexer'];
 
   constructor(id: string, indexerName: string) {
     super(Space.tableName, indexerName);
@@ -233,7 +16,7 @@ export class Space extends Model {
     this.initialSet('about', null);
     this.initialSet('controller', "");
     this.initialSet('voting_delay', 0);
-    this.initialSet('proposal_threshold', 0);
+    this.initialSet('proposal_threshold', 0n);
     this.initialSet('quorum', 0);
     this.initialSet('strategies', "[]");
     this.initialSet('strategies_nonnull', "[]");
@@ -247,7 +30,7 @@ export class Space extends Model {
     const model = new Space(id, indexerName);
     model.setExists();
 
-    for (const key in entity) {
+    for (const key of Space.fieldNames) {
       const value = entity[key] !== null && typeof entity[key] === 'object'
         ? JSON.stringify(entity[key])
         : entity[key];
@@ -298,11 +81,11 @@ export class Space extends Model {
   }
 
   get proposal_threshold(): bigint {
-    return this.get('proposal_threshold');
+    return BigInt(this.get('proposal_threshold'));
   }
 
-  set proposal_threshold(value: bigint) {
-    this.set('proposal_threshold', value);
+  set proposal_threshold(value: bigint | number | string) {
+    this.set('proposal_threshold', BigInt(value));
   }
 
   get quorum(): number {
@@ -341,6 +124,8 @@ export class Space extends Model {
 export class Proposal extends Model {
   static tableName = 'proposals';
 
+  static fieldNames = ['id', 'proposal_id', 'space', 'title', 'scores_total', 'active', 'progress', '_indexer'];
+
   constructor(id: string, indexerName: string) {
     super(Proposal.tableName, indexerName);
 
@@ -348,7 +133,7 @@ export class Proposal extends Model {
     this.initialSet('proposal_id', 0);
     this.initialSet('space', "");
     this.initialSet('title', "");
-    this.initialSet('scores_total', 0);
+    this.initialSet('scores_total', 0n);
     this.initialSet('active', false);
     this.initialSet('progress', "0");
     this.initialSet('_indexer', "");
@@ -361,7 +146,7 @@ export class Proposal extends Model {
     const model = new Proposal(id, indexerName);
     model.setExists();
 
-    for (const key in entity) {
+    for (const key of Proposal.fieldNames) {
       const value = entity[key] !== null && typeof entity[key] === 'object'
         ? JSON.stringify(entity[key])
         : entity[key];
@@ -404,11 +189,11 @@ export class Proposal extends Model {
   }
 
   get scores_total(): bigint {
-    return this.get('scores_total');
+    return BigInt(this.get('scores_total'));
   }
 
-  set scores_total(value: bigint) {
-    this.set('scores_total', value);
+  set scores_total(value: bigint | number | string) {
+    this.set('scores_total', BigInt(value));
   }
 
   get active(): boolean {
@@ -432,6 +217,229 @@ export class Proposal extends Model {
   }
 
   set _indexer(value: string) {
+    this.set('_indexer', value);
+  }
+}
+"
+`;
+
+exports[`codegen should generate javascript code 1`] = `
+"import { Model } from '@snapshot-labs/checkpoint';
+
+export class Space extends Model {
+  static tableName = 'spaces';
+
+  static fieldNames = ['id', 'name', 'about', 'controller', 'voting_delay', 'proposal_threshold', 'quorum', 'strategies', 'strategies_nonnull', '_indexer'];
+
+  constructor(id, indexerName) {
+    super(Space.tableName, indexerName);
+
+    this.initialSet('id', id);
+    this.initialSet('name', null);
+    this.initialSet('about', null);
+    this.initialSet('controller', "");
+    this.initialSet('voting_delay', 0);
+    this.initialSet('proposal_threshold', 0n);
+    this.initialSet('quorum', 0);
+    this.initialSet('strategies', "[]");
+    this.initialSet('strategies_nonnull', "[]");
+    this.initialSet('_indexer', "");
+  }
+
+  static async loadEntity(id, indexerName) {
+    const entity = await super._loadEntity(Space.tableName, id, indexerName);
+    if (!entity) return null;
+
+    const model = new Space(id, indexerName);
+    model.setExists();
+
+    for (const key of Space.fieldNames) {
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
+    }
+
+    return model;
+  }
+
+  get id() {
+    return this.get('id');
+  }
+
+  set id(value) {
+    this.set('id', value);
+  }
+
+  get name() {
+    return this.get('name');
+  }
+
+  set name(value) {
+    this.set('name', value);
+  }
+
+  get about() {
+    return this.get('about');
+  }
+
+  set about(value) {
+    this.set('about', value);
+  }
+
+  get controller() {
+    return this.get('controller');
+  }
+
+  set controller(value) {
+    this.set('controller', value);
+  }
+
+  get voting_delay() {
+    return this.get('voting_delay');
+  }
+
+  set voting_delay(value) {
+    this.set('voting_delay', value);
+  }
+
+  get proposal_threshold() {
+    return BigInt(this.get('proposal_threshold'));
+  }
+
+  set proposal_threshold(value) {
+    this.set('proposal_threshold', BigInt(value));
+  }
+
+  get quorum() {
+    return this.get('quorum');
+  }
+
+  set quorum(value) {
+    this.set('quorum', value);
+  }
+
+  get strategies() {
+    return JSON.parse(this.get('strategies'));
+  }
+
+  set strategies(value) {
+    this.set('strategies', JSON.stringify(value));
+  }
+
+  get strategies_nonnull() {
+    return JSON.parse(this.get('strategies_nonnull'));
+  }
+
+  set strategies_nonnull(value) {
+    this.set('strategies_nonnull', JSON.stringify(value));
+  }
+
+  get _indexer() {
+    return this.get('_indexer');
+  }
+
+  set _indexer(value) {
+    this.set('_indexer', value);
+  }
+}
+
+export class Proposal extends Model {
+  static tableName = 'proposals';
+
+  static fieldNames = ['id', 'proposal_id', 'space', 'title', 'scores_total', 'active', 'progress', '_indexer'];
+
+  constructor(id, indexerName) {
+    super(Proposal.tableName, indexerName);
+
+    this.initialSet('id', id);
+    this.initialSet('proposal_id', 0);
+    this.initialSet('space', "");
+    this.initialSet('title', "");
+    this.initialSet('scores_total', 0n);
+    this.initialSet('active', false);
+    this.initialSet('progress', "0");
+    this.initialSet('_indexer', "");
+  }
+
+  static async loadEntity(id, indexerName) {
+    const entity = await super._loadEntity(Proposal.tableName, id, indexerName);
+    if (!entity) return null;
+
+    const model = new Proposal(id, indexerName);
+    model.setExists();
+
+    for (const key of Proposal.fieldNames) {
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
+    }
+
+    return model;
+  }
+
+  get id() {
+    return this.get('id');
+  }
+
+  set id(value) {
+    this.set('id', value);
+  }
+
+  get proposal_id() {
+    return this.get('proposal_id');
+  }
+
+  set proposal_id(value) {
+    this.set('proposal_id', value);
+  }
+
+  get space() {
+    return this.get('space');
+  }
+
+  set space(value) {
+    this.set('space', value);
+  }
+
+  get title() {
+    return this.get('title');
+  }
+
+  set title(value) {
+    this.set('title', value);
+  }
+
+  get scores_total() {
+    return BigInt(this.get('scores_total'));
+  }
+
+  set scores_total(value) {
+    this.set('scores_total', BigInt(value));
+  }
+
+  get active() {
+    return this.get('active');
+  }
+
+  set active(value) {
+    this.set('active', value);
+  }
+
+  get progress() {
+    return this.get('progress');
+  }
+
+  set progress(value) {
+    this.set('progress', value);
+  }
+
+  get _indexer() {
+    return this.get('_indexer');
+  }
+
+  set _indexer(value) {
     this.set('_indexer', value);
   }
 }

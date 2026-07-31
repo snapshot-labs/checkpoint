@@ -88,10 +88,13 @@ describe('getInitialValue', () => {
     expect(getInitialValue(spaceFields['about'].type)).toBeNull();
   });
 
-  it('should return 0 for Int/Float/BigInt types', () => {
+  it('should return 0 for Int/Float types', () => {
     expect(getInitialValue(spaceFields['voting_delay'].type)).toBe(0);
-    expect(getInitialValue(spaceFields['proposal_threshold'].type)).toBe(0);
     expect(getInitialValue(spaceFields['quorum'].type)).toBe(0);
+  });
+
+  it('should return 0n for BigInt types', () => {
+    expect(getInitialValue(spaceFields['proposal_threshold'].type)).toBe(0n);
   });
 
   it('should return 0 string for BigDecimal types', () => {
