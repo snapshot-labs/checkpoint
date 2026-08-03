@@ -1,21 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[` 1`] = `"'id' field for type Vote must be non nullable."`;
-
-exports[` 2`] = `"'id' field for type Vote is not a scalar type."`;
-
-exports[` 3`] = `"'id' field for type Participant is not a scalar type."`;
-
-exports[`GqlEntityController createEntityStores should work 1`] = `
-"drop table if exists \`votes\`;
-create table \`votes\` (\`uid\` char(36) default (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))), \`block_range\` int8range not null, \`id\` integer not null, \`name\` varchar(256), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, primary key (\`uid\`));
-create index \`votes_id_index\` on \`votes\` (\`id\`);
-create index \`votes_name_index\` on \`votes\` (\`name\`);
-create index \`votes_authenticators_index\` on \`votes\` (\`authenticators\`);
-create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
-create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
-create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
-`;
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
@@ -60,6 +43,58 @@ input Vote_filter {
   authenticators_not: [String]
   authenticators_contains: [String]
   authenticators_not_contains: [String]
+}"
+`;
+
+exports[`GqlEntityController generateQueryFields should fail for non null object id 1`] = `"'id' field for type Vote must be non nullable."`;
+
+exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 1`] = `"'id' field for type Vote is not a scalar type."`;
+
+exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 2 1`] = `"'id' field for type Participant is not a scalar type."`;
+
+exports[`GqlEntityController createEntityStores should work 1`] = `
+"drop table if exists \`votes\`;
+create table \`votes\` (\`uid\` char(36) default (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))), \`block_range\` int8range not null, \`id\` integer not null, \`name\` varchar(256), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, primary key (\`uid\`));
+create index \`votes_id_index\` on \`votes\` (\`id\`);
+create index \`votes_name_index\` on \`votes\` (\`name\`);
+create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
+create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
+create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
+`;
+
+exports[`GqlEntityController generateSampleQuery should return correct query sample for first and only entity 1`] = `
+"
+# Welcome to Checkpoint. Try running the below example query from
+# your defined entity.
+    
+query {
+    votes (first: 10) {
+        id
+        name
+        created_at
+    }
+}"
+`;
+
+exports[`GqlEntityController generateSampleQuery should return correct query sample for nested objects 1`] = `
+"
+# Welcome to Checkpoint. Try running the below example query from
+# your defined entity.
+    
+query {
+    votes (first: 10) {
+        id
+        name
+        poster {
+            id
+            name
+            venue {
+                id
+                location
+            }
+        }
+        created_at
+    }
 }"
 `;
 
@@ -196,45 +231,3 @@ input _Checkpoint_filter {
   contract_address_not_in: [String]
 }"
 `;
-
-exports[`GqlEntityController generateSampleQuery should return correct query sample for first and only entity 1`] = `
-"
-# Welcome to Checkpoint. Try running the below example query from
-# your defined entity.
-    
-query {
-    votes (first: 10) {
-        id
-        name
-        created_at
-    }
-}"
-`;
-
-exports[`GqlEntityController generateSampleQuery should return correct query sample for nested objects 1`] = `
-"
-# Welcome to Checkpoint. Try running the below example query from
-# your defined entity.
-    
-query {
-    votes (first: 10) {
-        id
-        name
-        poster {
-            id
-            name
-            venue {
-                id
-                location
-            }
-        }
-        created_at
-    }
-}"
-`;
-
-exports[`GqlEntityController generateQueryFields should fail for non null object id 1`] = `"'id' field for type Vote must be non nullable."`;
-
-exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 1`] = `"'id' field for type Vote is not a scalar type."`;
-
-exports[`GqlEntityController generateQueryFields should fail for object id is not scalar type 2 1`] = `"'id' field for type Participant is not a scalar type."`;
