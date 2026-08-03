@@ -265,7 +265,7 @@ export class GqlEntityController {
               column = column.notNullable();
             }
 
-            if (!['text', 'json'].includes(sqlType.name)) {
+            if (!['text', 'json', 'jsonb'].includes(sqlType.name)) {
               column.index();
             }
           });
