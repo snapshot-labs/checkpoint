@@ -107,6 +107,28 @@ export const getJSType = (
   return { isNullable, isList, baseType };
 };
 
+/** Maximum length of varchar columns created for String/ID fields. */
+const VARCHAR_LENGTH = 256;
+
+const isVarcharField = (type: GraphQLType): boolean => {
+  const nonNullType = type instanceof GraphQLNonNull ? type.ofType : type;
+
+  if (nonNullType === GraphQLString || nonNullType === GraphQLID) return true;
+
+  if (nonNullType instanceof GraphQLObjectType) {
+    const idField = nonNullType.getFields()['id'];
+
+    return (
+      idField !== undefined &&
+      idField.type instanceof GraphQLNonNull &&
+      idField.type.ofType instanceof GraphQLScalarType &&
+      ['String', 'ID'].includes(idField.type.ofType.name)
+    );
+  }
+
+  return false;
+};
+
 const isPersistedField = (field: GraphQLField<any, any>) => {
   if (getComputedDirective(field)) return false;
 
@@ -159,6 +181,16 @@ export const codegen = (
         ? `  constructor(id, indexerName) {\n`
         : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
     contents += `    super(${modelName}.tableName, indexerName);\n\n`;
+    if (idField && isVarcharField(idField.type)) {
+      contents += `    if ([...id].length > ${VARCHAR_LENGTH}) {\n`;
+      contents += `      throw new Error('Value for ${modelName}.id exceeds ${VARCHAR_LENGTH} characters');\n`;
+      contents += `    }\n\n`;
+    }
+    if (idType.baseType === 'string') {
+      contents += `    if (id.includes('\\u0000')) {\n`;
+      contents += `      throw new Error('Value for ${modelName}.id contains a NUL character');\n`;
+      contents += `    }\n\n`;
+    }
     persistedFields.forEach(field => {
       const rawInitialValue = getInitialValue(field.type, decimalTypes);
       const initialValue =
@@ -223,6 +255,24 @@ export const codegen = (
         format === 'javascript'
           ? `  set ${field.name}(value) {\n`
           : `  set ${field.name}(value: ${setterAnnotation}) {\n`;
+      if (isVarcharField(field.type)) {
+        const lengthCheck = `[...value].length > ${VARCHAR_LENGTH}`;
+        contents += isNullable
+          ? `    if (value !== null && ${lengthCheck}) {\n`
+          : `    if (${lengthCheck}) {\n`;
+        contents += `      throw new Error('Value for ${modelName}.${field.name} exceeds ${VARCHAR_LENGTH} characters');\n`;
+        contents += `    }\n\n`;
+      }
+      if (baseType === 'string' || baseType === 'string[]') {
+        const nulCheck = isList
+          ? `value.some(item => typeof item === 'string' && item.includes('\\u0000'))`
+          : `value.includes('\\u0000')`;
+        contents += isNullable
+          ? `    if (value !== null && ${nulCheck}) {\n`
+          : `    if (${nulCheck}) {\n`;
+        contents += `      throw new Error('Value for ${modelName}.${field.name} contains a NUL character');\n`;
+        contents += `    }\n\n`;
+      }
       contents += `    this.set('${field.name}', ${setterExpression});\n`;
       contents += `  }\n\n`;
     });

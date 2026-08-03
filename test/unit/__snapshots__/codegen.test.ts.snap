@@ -11,6 +11,14 @@ export class Space extends Model {
   constructor(id: string, indexerName: string) {
     super(Space.tableName, indexerName);
 
+    if ([...id].length > 256) {
+      throw new Error('Value for Space.id exceeds 256 characters');
+    }
+
+    if (id.includes('\\u0000')) {
+      throw new Error('Value for Space.id contains a NUL character');
+    }
+
     this.initialSet('id', id);
     this.initialSet('name', null);
     this.initialSet('about', null);
@@ -45,6 +53,14 @@ export class Space extends Model {
   }
 
   set id(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space.id exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space.id contains a NUL character');
+    }
+
     this.set('id', value);
   }
 
@@ -53,6 +69,14 @@ export class Space extends Model {
   }
 
   set name(value: string | null) {
+    if (value !== null && [...value].length > 256) {
+      throw new Error('Value for Space.name exceeds 256 characters');
+    }
+
+    if (value !== null && value.includes('\\u0000')) {
+      throw new Error('Value for Space.name contains a NUL character');
+    }
+
     this.set('name', value);
   }
 
@@ -61,6 +85,14 @@ export class Space extends Model {
   }
 
   set about(value: string | null) {
+    if (value !== null && [...value].length > 256) {
+      throw new Error('Value for Space.about exceeds 256 characters');
+    }
+
+    if (value !== null && value.includes('\\u0000')) {
+      throw new Error('Value for Space.about contains a NUL character');
+    }
+
     this.set('about', value);
   }
 
@@ -69,6 +101,14 @@ export class Space extends Model {
   }
 
   set controller(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space.controller exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space.controller contains a NUL character');
+    }
+
     this.set('controller', value);
   }
 
@@ -101,6 +141,10 @@ export class Space extends Model {
   }
 
   set strategies(value: string[]) {
+    if (value.some(item => typeof item === 'string' && item.includes('\\u0000'))) {
+      throw new Error('Value for Space.strategies contains a NUL character');
+    }
+
     this.set('strategies', JSON.stringify(value));
   }
 
@@ -109,6 +153,10 @@ export class Space extends Model {
   }
 
   set strategies_nonnull(value: string[]) {
+    if (value.some(item => typeof item === 'string' && item.includes('\\u0000'))) {
+      throw new Error('Value for Space.strategies_nonnull contains a NUL character');
+    }
+
     this.set('strategies_nonnull', JSON.stringify(value));
   }
 
@@ -117,6 +165,14 @@ export class Space extends Model {
   }
 
   set _indexer(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space._indexer exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space._indexer contains a NUL character');
+    }
+
     this.set('_indexer', value);
   }
 }
@@ -128,6 +184,14 @@ export class Proposal extends Model {
 
   constructor(id: string, indexerName: string) {
     super(Proposal.tableName, indexerName);
+
+    if ([...id].length > 256) {
+      throw new Error('Value for Proposal.id exceeds 256 characters');
+    }
+
+    if (id.includes('\\u0000')) {
+      throw new Error('Value for Proposal.id contains a NUL character');
+    }
 
     this.initialSet('id', id);
     this.initialSet('proposal_id', 0);
@@ -161,6 +225,14 @@ export class Proposal extends Model {
   }
 
   set id(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal.id exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.id contains a NUL character');
+    }
+
     this.set('id', value);
   }
 
@@ -177,6 +249,14 @@ export class Proposal extends Model {
   }
 
   set space(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal.space exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.space contains a NUL character');
+    }
+
     this.set('space', value);
   }
 
@@ -185,6 +265,10 @@ export class Proposal extends Model {
   }
 
   set title(value: string) {
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.title contains a NUL character');
+    }
+
     this.set('title', value);
   }
 
@@ -209,6 +293,10 @@ export class Proposal extends Model {
   }
 
   set progress(value: string) {
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.progress contains a NUL character');
+    }
+
     this.set('progress', value);
   }
 
@@ -217,6 +305,14 @@ export class Proposal extends Model {
   }
 
   set _indexer(value: string) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal._indexer exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal._indexer contains a NUL character');
+    }
+
     this.set('_indexer', value);
   }
 }
@@ -233,6 +329,14 @@ export class Space extends Model {
 
   constructor(id, indexerName) {
     super(Space.tableName, indexerName);
+
+    if ([...id].length > 256) {
+      throw new Error('Value for Space.id exceeds 256 characters');
+    }
+
+    if (id.includes('\\u0000')) {
+      throw new Error('Value for Space.id contains a NUL character');
+    }
 
     this.initialSet('id', id);
     this.initialSet('name', null);
@@ -268,6 +372,14 @@ export class Space extends Model {
   }
 
   set id(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space.id exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space.id contains a NUL character');
+    }
+
     this.set('id', value);
   }
 
@@ -276,6 +388,14 @@ export class Space extends Model {
   }
 
   set name(value) {
+    if (value !== null && [...value].length > 256) {
+      throw new Error('Value for Space.name exceeds 256 characters');
+    }
+
+    if (value !== null && value.includes('\\u0000')) {
+      throw new Error('Value for Space.name contains a NUL character');
+    }
+
     this.set('name', value);
   }
 
@@ -284,6 +404,14 @@ export class Space extends Model {
   }
 
   set about(value) {
+    if (value !== null && [...value].length > 256) {
+      throw new Error('Value for Space.about exceeds 256 characters');
+    }
+
+    if (value !== null && value.includes('\\u0000')) {
+      throw new Error('Value for Space.about contains a NUL character');
+    }
+
     this.set('about', value);
   }
 
@@ -292,6 +420,14 @@ export class Space extends Model {
   }
 
   set controller(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space.controller exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space.controller contains a NUL character');
+    }
+
     this.set('controller', value);
   }
 
@@ -324,6 +460,10 @@ export class Space extends Model {
   }
 
   set strategies(value) {
+    if (value.some(item => typeof item === 'string' && item.includes('\\u0000'))) {
+      throw new Error('Value for Space.strategies contains a NUL character');
+    }
+
     this.set('strategies', JSON.stringify(value));
   }
 
@@ -332,6 +472,10 @@ export class Space extends Model {
   }
 
   set strategies_nonnull(value) {
+    if (value.some(item => typeof item === 'string' && item.includes('\\u0000'))) {
+      throw new Error('Value for Space.strategies_nonnull contains a NUL character');
+    }
+
     this.set('strategies_nonnull', JSON.stringify(value));
   }
 
@@ -340,6 +484,14 @@ export class Space extends Model {
   }
 
   set _indexer(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Space._indexer exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Space._indexer contains a NUL character');
+    }
+
     this.set('_indexer', value);
   }
 }
@@ -351,6 +503,14 @@ export class Proposal extends Model {
 
   constructor(id, indexerName) {
     super(Proposal.tableName, indexerName);
+
+    if ([...id].length > 256) {
+      throw new Error('Value for Proposal.id exceeds 256 characters');
+    }
+
+    if (id.includes('\\u0000')) {
+      throw new Error('Value for Proposal.id contains a NUL character');
+    }
 
     this.initialSet('id', id);
     this.initialSet('proposal_id', 0);
@@ -384,6 +544,14 @@ export class Proposal extends Model {
   }
 
   set id(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal.id exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.id contains a NUL character');
+    }
+
     this.set('id', value);
   }
 
@@ -400,6 +568,14 @@ export class Proposal extends Model {
   }
 
   set space(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal.space exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.space contains a NUL character');
+    }
+
     this.set('space', value);
   }
 
@@ -408,6 +584,10 @@ export class Proposal extends Model {
   }
 
   set title(value) {
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.title contains a NUL character');
+    }
+
     this.set('title', value);
   }
 
@@ -432,6 +612,10 @@ export class Proposal extends Model {
   }
 
   set progress(value) {
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal.progress contains a NUL character');
+    }
+
     this.set('progress', value);
   }
 
@@ -440,6 +624,14 @@ export class Proposal extends Model {
   }
 
   set _indexer(value) {
+    if ([...value].length > 256) {
+      throw new Error('Value for Proposal._indexer exceeds 256 characters');
+    }
+
+    if (value.includes('\\u0000')) {
+      throw new Error('Value for Proposal._indexer contains a NUL character');
+    }
+
     this.set('_indexer', value);
   }
 }

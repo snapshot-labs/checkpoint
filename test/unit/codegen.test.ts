@@ -8,6 +8,7 @@ import {
   getTypeInfo
 } from '../../src/codegen';
 import { GqlEntityController } from '../../src/graphql/controller';
+import Model from '../../src/orm/model';
 import { extendSchema } from '../../src/utils/graphql';
 
 const SCHEMA_SOURCE = `
@@ -200,5 +201,122 @@ describe('codegen', () => {
     expect(
       codegen(controller, overridesConfig, 'javascript')
     ).toMatchSnapshot();
+  });
+});
+
+describe('generated models', () => {
+  const extendedSchema = extendSchema(SCHEMA_SOURCE);
+  const controller = new GqlEntityController(extendedSchema);
+
+  const source = codegen(controller, {}, 'javascript')
+    .replace(/^import .*\n\n/, '')
+    .replace(/export /g, '');
+  const { Space, Proposal } = new Function(
+    'Model',
+    `${source}\nreturn { Space, Proposal };`
+  )(Model);
+
+  describe('varchar length validation', () => {
+    it('should reject id longer than 256 characters', () => {
+      expect(() => new Space('x'.repeat(257), 'indexer')).toThrow(
+        'Value for Space.id exceeds 256 characters'
+      );
+    });
+
+    it('should reject values longer than 256 characters for String fields', () => {
+      const space = new Space('space-1', 'indexer');
+
+      expect(() => {
+        space.controller = 'x'.repeat(257);
+      }).toThrow('Value for Space.controller exceeds 256 characters');
+    });
+
+    it('should accept values up to 256 characters', () => {
+      const space = new Space('space-1', 'indexer');
+      space.controller = 'x'.repeat(256);
+
+      expect(space.controller).toHaveLength(256);
+    });
+
+    it('should count characters, not UTF-16 code units', () => {
+      const space = new Space('space-1', 'indexer');
+      const emojis = '🙂'.repeat(200);
+      space.controller = emojis;
+
+      expect(space.controller).toBe(emojis);
+    });
+
+    it('should accept null for nullable String fields', () => {
+      const space = new Space('space-1', 'indexer');
+      space.name = null;
+
+      expect(space.name).toBeNull();
+    });
+
+    it('should reject long values for nullable String fields', () => {
+      const space = new Space('space-1', 'indexer');
+
+      expect(() => {
+        space.name = 'x'.repeat(257);
+      }).toThrow('Value for Space.name exceeds 256 characters');
+    });
+
+    it('should reject long values for object reference fields', () => {
+      const proposal = new Proposal('proposal-1', 'indexer');
+
+      expect(() => {
+        proposal.space = 'x'.repeat(257);
+      }).toThrow('Value for Proposal.space exceeds 256 characters');
+    });
+
+    it('should not limit Text fields', () => {
+      const proposal = new Proposal('proposal-1', 'indexer');
+      const longText = 'x'.repeat(10000);
+      proposal.title = longText;
+
+      expect(proposal.title).toBe(longText);
+    });
+
+    it('should not limit list fields', () => {
+      const space = new Space('space-1', 'indexer');
+      const strategies = Array.from({ length: 100 }, (_, i) =>
+        `strategy-${i}`.repeat(30)
+      );
+      space.strategies = strategies;
+
+      expect(space.strategies).toEqual(strategies);
+    });
+  });
+
+  describe('NUL character validation', () => {
+    it('should reject id containing NUL character', () => {
+      expect(() => new Space('space\u0000-1', 'indexer')).toThrow(
+        'Value for Space.id contains a NUL character'
+      );
+    });
+
+    it('should reject NUL character in String fields', () => {
+      const space = new Space('space-1', 'indexer');
+
+      expect(() => {
+        space.controller = 'abc\u0000def';
+      }).toThrow('Value for Space.controller contains a NUL character');
+    });
+
+    it('should reject NUL character in Text fields', () => {
+      const proposal = new Proposal('proposal-1', 'indexer');
+
+      expect(() => {
+        proposal.title = 'abc\u0000def';
+      }).toThrow('Value for Proposal.title contains a NUL character');
+    });
+
+    it('should reject NUL character in list elements', () => {
+      const space = new Space('space-1', 'indexer');
+
+      expect(() => {
+        space.strategies = ['ok', 'bad\u0000'];
+      }).toThrow('Value for Space.strategies contains a NUL character');
+    });
   });
 });
