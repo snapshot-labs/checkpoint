@@ -182,12 +182,12 @@ export const codegen = (
         : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
     contents += `    super(${modelName}.tableName, indexerName);\n\n`;
     if (idField && isVarcharField(idField.type)) {
-      contents += `    if ([...id].length > ${VARCHAR_LENGTH}) {\n`;
+      contents += `    if (typeof id === 'string' && [...id].length > ${VARCHAR_LENGTH}) {\n`;
       contents += `      throw new Error('Value for ${modelName}.id exceeds ${VARCHAR_LENGTH} characters');\n`;
       contents += `    }\n\n`;
     }
     if (idType.baseType === 'string') {
-      contents += `    if (id.includes('\\u0000')) {\n`;
+      contents += `    if (typeof id === 'string' && id.includes('\\u0000')) {\n`;
       contents += `      throw new Error('Value for ${modelName}.id contains a NUL character');\n`;
       contents += `    }\n\n`;
     }
@@ -256,20 +256,15 @@ export const codegen = (
           ? `  set ${field.name}(value) {\n`
           : `  set ${field.name}(value: ${setterAnnotation}) {\n`;
       if (isVarcharField(field.type)) {
-        const lengthCheck = `[...value].length > ${VARCHAR_LENGTH}`;
-        contents += isNullable
-          ? `    if (value !== null && ${lengthCheck}) {\n`
-          : `    if (${lengthCheck}) {\n`;
+        contents += `    if (typeof value === 'string' && [...value].length > ${VARCHAR_LENGTH}) {\n`;
         contents += `      throw new Error('Value for ${modelName}.${field.name} exceeds ${VARCHAR_LENGTH} characters');\n`;
         contents += `    }\n\n`;
       }
       if (baseType === 'string' || baseType === 'string[]') {
         const nulCheck = isList
-          ? `value.some(item => typeof item === 'string' && item.includes('\\u0000'))`
-          : `value.includes('\\u0000')`;
-        contents += isNullable
-          ? `    if (value !== null && ${nulCheck}) {\n`
-          : `    if (${nulCheck}) {\n`;
+          ? `Array.isArray(value) && value.some(item => typeof item === 'string' && item.includes('\\u0000'))`
+          : `typeof value === 'string' && value.includes('\\u0000')`;
+        contents += `    if (${nulCheck}) {\n`;
         contents += `      throw new Error('Value for ${modelName}.${field.name} contains a NUL character');\n`;
         contents += `    }\n\n`;
       }
