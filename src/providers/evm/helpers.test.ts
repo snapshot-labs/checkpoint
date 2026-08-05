@@ -63,6 +63,23 @@ describe('getRangeHint', () => {
 
       expect(result).toEqual(null);
     });
+
+    it('should not return range if data is missing to', () => {
+      const infuraError = new CustomJsonRpcError(
+        'Block range too large',
+        -32005,
+        {
+          from: '0x3e8'
+        }
+      );
+
+      const result = getRangeHint(infuraError, {
+        from: 1000,
+        to: 2000
+      });
+
+      expect(result).toEqual(null);
+    });
   });
 
   describe('Ankr error (code: -32062)', () => {

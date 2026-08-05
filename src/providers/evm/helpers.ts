@@ -11,7 +11,7 @@ export function getRangeHint(err: unknown, currentRange: Range): Range | null {
   }
 
   // Infura (code: -32005)
-  if (err.code === -32005 && err.data.from && err.data.from) {
+  if (err.code === -32005 && err.data.from && err.data.to) {
     const from = parseInt(err.data.from, 16);
     const to = parseInt(err.data.to, 16);
 
