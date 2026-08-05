@@ -529,26 +529,43 @@ export class Container implements Instance {
       getTableName(entity.name.toLowerCase())
     );
 
-    await this.knex.transaction(async trx => {
-      for (const tableName of tables) {
-        await trx
-          .table(tableName)
-          .where('_indexer', this.indexerName)
-          .andWhereRaw('lower(block_range) > ?', [lastGoodBlock])
-          .delete();
+    let retryDelay = this.config.fetch_interval || DEFAULT_FETCH_INTERVAL;
+    while (true) {
+      try {
+        await this.knex.transaction(async trx => {
+          for (const tableName of tables) {
+            await trx
+              .table(tableName)
+              .where('_indexer', this.indexerName)
+              .andWhereRaw('lower(block_range) > ?', [lastGoodBlock])
+              .delete();
 
-        await trx
-          .table(tableName)
-          .where('_indexer', this.indexerName)
-          .andWhereRaw('block_range @> int8(??)', [lastGoodBlock])
-          .update({
-            block_range: this.knex.raw('int8range(lower(block_range), NULL)')
-          });
+            await trx
+              .table(tableName)
+              .where('_indexer', this.indexerName)
+              .andWhereRaw('block_range @> int8(??)', [lastGoodBlock])
+              .andWhereRaw('NOT upper_inf(block_range)')
+              .update({
+                block_range: this.knex.raw(
+                  'int8range(lower(block_range), NULL)'
+                )
+              });
+          }
+        });
+
+        // TODO: when we have full transaction support, we should include this in the transaction
+        await this.store.removeFutureData(this.indexerName, lastGoodBlock);
+
+        break;
+      } catch (err) {
+        this.log.error(
+          { err, blockNumber: lastGoodBlock },
+          'reorg cleanup failed, retrying'
+        );
+        await sleep(retryDelay);
+        retryDelay = Math.min(retryDelay * 2, MAX_FLUSH_RETRY_DELAY);
       }
-    });
-
-    // TODO: when we have full transaction support, we should include this in the transaction
-    await this.store.removeFutureData(this.indexerName, lastGoodBlock);
+    }
 
     this.entityBuffer.reset();
     this.cpBlocksCache = null;
