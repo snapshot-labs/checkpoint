@@ -541,6 +541,7 @@ export class Container implements Instance {
           .table(tableName)
           .where('_indexer', this.indexerName)
           .andWhereRaw('block_range @> int8(??)', [lastGoodBlock])
+          .andWhereRaw('NOT upper_inf(block_range)')
           .update({
             block_range: this.knex.raw('int8range(lower(block_range), NULL)')
           });
