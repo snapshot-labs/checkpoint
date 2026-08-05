@@ -54,7 +54,7 @@ describe('applyQueryFilter', () => {
     });
 
     expect(result.toString()).toBe(
-      "select * from `posts` where posts.block_range @> int8(123) and `posts`.`_indexer` = 'indexer'"
+      "select * from `posts` where posts.block_range @> 123::int8 and `posts`.`_indexer` = 'indexer'"
     );
   });
 

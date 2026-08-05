@@ -25,7 +25,7 @@ export function applyQueryFilter(
   if (!isInternalTable) {
     filteredQuery =
       filters.block !== undefined
-        ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [
+        ? query.andWhereRaw(`${tableName}.block_range @> ?::int8`, [
             filters.block
           ])
         : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
