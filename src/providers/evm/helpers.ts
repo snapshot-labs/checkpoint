@@ -32,7 +32,6 @@ export function getRangeHint(err: unknown, currentRange: Range): Range | null {
     const to =
       currentRange.from + Math.ceil((currentRange.to - currentRange.from) / 2);
 
-    // Range this small can't be shrunk further, retrying it would loop forever
     if (to >= currentRange.to) {
       return null;
     }
