@@ -156,5 +156,27 @@ describe('getRangeHint', () => {
         to: 1251
       });
     });
+
+    it('should return null when range can not be shrunk further', () => {
+      const edgeError = new CustomJsonRpcError(
+        'getLogs request exceeded max allowed range',
+        -32012,
+        {}
+      );
+
+      expect(
+        getRangeHint(edgeError, {
+          from: 1000,
+          to: 1001
+        })
+      ).toEqual(null);
+
+      expect(
+        getRangeHint(edgeError, {
+          from: 1000,
+          to: 1000
+        })
+      ).toEqual(null);
+    });
   });
 });
