@@ -37,6 +37,7 @@ const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
   private readonly client: PublicClient;
+  private readonly maxBlocksPerRequest: number;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
@@ -57,6 +58,8 @@ export class EvmProvider extends BaseProvider {
         timeout: CLIENT_TIMEOUT
       })
     });
+    this.maxBlocksPerRequest =
+      instance.config.max_blocks_per_request ?? MAX_BLOCKS_PER_REQUEST;
 
     this.writers = writers;
   }
@@ -431,7 +434,7 @@ export class EvmProvider extends BaseProvider {
     let result = [] as Log[];
 
     let currentFrom = fromBlock;
-    let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
+    let currentTo = Math.min(toBlock, currentFrom + this.maxBlocksPerRequest);
     while (true) {
       try {
         const logs = await this._getLogs({
@@ -445,7 +448,7 @@ export class EvmProvider extends BaseProvider {
 
         if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
-        currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
+        currentTo = Math.min(toBlock, currentFrom + this.maxBlocksPerRequest);
       } catch (err: unknown) {
         const rangeHint = getRangeHint(err, {
           from: currentFrom,
