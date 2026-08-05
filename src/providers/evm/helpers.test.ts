@@ -63,6 +63,23 @@ describe('getRangeHint', () => {
 
       expect(result).toEqual(null);
     });
+
+    it('should not return range if data is missing to', () => {
+      const infuraError = new CustomJsonRpcError(
+        'Block range too large',
+        -32005,
+        {
+          from: '0x3e8'
+        }
+      );
+
+      const result = getRangeHint(infuraError, {
+        from: 1000,
+        to: 2000
+      });
+
+      expect(result).toEqual(null);
+    });
   });
 
   describe('Ankr error (code: -32062)', () => {
@@ -138,6 +155,28 @@ describe('getRangeHint', () => {
         from: 1000,
         to: 1251
       });
+    });
+
+    it('should return null when range can not be shrunk further', () => {
+      const edgeError = new CustomJsonRpcError(
+        'getLogs request exceeded max allowed range',
+        -32012,
+        {}
+      );
+
+      expect(
+        getRangeHint(edgeError, {
+          from: 1000,
+          to: 1001
+        })
+      ).toEqual(null);
+
+      expect(
+        getRangeHint(edgeError, {
+          from: 1000,
+          to: 1000
+        })
+      ).toEqual(null);
     });
   });
 });
