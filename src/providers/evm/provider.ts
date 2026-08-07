@@ -434,7 +434,10 @@ export class EvmProvider extends BaseProvider {
     let result = [] as Log[];
 
     let currentFrom = fromBlock;
-    let currentTo = Math.min(toBlock, currentFrom + this.maxBlocksPerRequest);
+    let currentTo = Math.min(
+      toBlock,
+      currentFrom + this.maxBlocksPerRequest - 1
+    );
     while (true) {
       try {
         const logs = await this._getLogs({
@@ -448,7 +451,10 @@ export class EvmProvider extends BaseProvider {
 
         if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
-        currentTo = Math.min(toBlock, currentFrom + this.maxBlocksPerRequest);
+        currentTo = Math.min(
+          toBlock,
+          currentFrom + this.maxBlocksPerRequest - 1
+        );
       } catch (err: unknown) {
         const rangeHint = getRangeHint(err, {
           from: currentFrom,
