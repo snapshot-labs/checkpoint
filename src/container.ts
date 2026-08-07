@@ -543,7 +543,7 @@ export class Container implements Instance {
             await trx
               .table(tableName)
               .where('_indexer', this.indexerName)
-              .andWhereRaw('block_range @> int8(??)', [lastGoodBlock])
+              .andWhereRaw('block_range @> ?::int8', [lastGoodBlock])
               .andWhereRaw('NOT upper_inf(block_range)')
               .update({
                 block_range: this.knex.raw(
