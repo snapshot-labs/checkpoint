@@ -1,5 +1,6 @@
 import { createServer, Server } from 'http';
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { InvalidParamsRpcError } from 'viem';
 import { HyperSyncEvmProvider } from './hypersync-provider';
 import { EvmProvider } from './provider';
 import { createLogger } from '../../utils/logger';
@@ -88,8 +89,8 @@ describe('EvmProvider.processBlock', () => {
     });
     const provider = new EvmProvider(params);
 
-    await expect(provider.processBlock(1000, null)).rejects.not.toBeInstanceOf(
-      BlockNotFoundError
+    await expect(provider.processBlock(1000, null)).rejects.toBeInstanceOf(
+      InvalidParamsRpcError
     );
 
     expect(errorSpy).toHaveBeenCalledWith(
@@ -100,7 +101,7 @@ describe('EvmProvider.processBlock', () => {
 });
 
 describe('HyperSyncEvmProvider.processBlock', () => {
-  it('should throw checkpoint BlockNotFoundError when the block is missing from both cache and rpc', async () => {
+  it('should throw checkpoint BlockNotFoundError when the block is missing from rpc (cache empty)', async () => {
     const { errorSpy, params } = await createProviderFixture(MISSING_BLOCK);
     const provider = new HyperSyncEvmProvider({
       ...params,
