@@ -9,7 +9,8 @@ import {
   ParseEventLogsReturnType,
   PublicClient,
   RpcLog,
-  stringToBytes
+  stringToBytes,
+  BlockNotFoundError as ViemBlockNotFoundError
 } from 'viem';
 import { getRangeHint } from './helpers';
 import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
@@ -101,13 +102,13 @@ export class EvmProvider extends BaseProvider {
         block = await this.fetchBlock(blockNumber);
       }
     } catch (err) {
+      if (err instanceof BlockNotFoundError) {
+        this.log.info({ blockNumber }, 'block not found');
+        throw err;
+      }
+
       this.log.error({ blockNumber, err }, 'getting block failed... retrying');
       throw err;
-    }
-
-    if (!hasPreloadedBlockEvents && block === null) {
-      this.log.info({ blockNumber }, 'block not found');
-      throw new BlockNotFoundError();
     }
 
     try {
@@ -532,9 +533,17 @@ export class EvmProvider extends BaseProvider {
   }
 
   protected async fetchBlock(blockNumber: number): Promise<Block> {
-    return this.client.getBlock({
-      blockNumber: BigInt(blockNumber)
-    });
+    try {
+      return await this.client.getBlock({
+        blockNumber: BigInt(blockNumber)
+      });
+    } catch (err) {
+      if (err instanceof ViemBlockNotFoundError) {
+        throw new BlockNotFoundError();
+      }
+
+      throw err;
+    }
   }
 
   protected async getLogsForSources({
