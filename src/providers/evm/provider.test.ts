@@ -1,12 +1,13 @@
 import { createServer, Server } from 'http';
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { HyperSyncEvmProvider } from './hypersync-provider';
 import { EvmProvider } from './provider';
-import { Logger } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
 import { BlockNotFoundError, Instance } from '../base';
 
 type JsonRpcResponse = { result: unknown } | { error: unknown };
-type LogLine = { level: string; msg: string };
+
+const MISSING_BLOCK: JsonRpcResponse = { result: null };
 
 const servers: Server[] = [];
 
@@ -32,91 +33,77 @@ async function startRpcServer(response: JsonRpcResponse): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
-function createTestLogger() {
-  const lines: LogLine[] = [];
-  const record = (level: string) => (_obj: unknown, msg: string) => {
-    lines.push({ level, msg });
-  };
+async function createProviderFixture(response: JsonRpcResponse) {
+  const url = await startRpcServer(response);
+  const log = createLogger({ level: 'silent' });
 
   return {
-    lines,
-    log: {
-      debug: record('debug'),
-      info: record('info'),
-      warn: record('warn'),
-      error: record('error')
-    } as unknown as Logger
+    infoSpy: spyOn(log, 'info'),
+    errorSpy: spyOn(log, 'error'),
+    params: {
+      instance: { config: { network_node_url: url } } as unknown as Instance,
+      log,
+      writers: {}
+    }
   };
 }
-
-function createTestInstance(networkNodeUrl: string): Instance {
-  return {
-    config: { network_node_url: networkNodeUrl, sources: [] },
-    opts: {},
-    getCurrentSources: () => [],
-    setBlockHash: async () => {},
-    setLastIndexedBlock: async () => {},
-    insertCheckpoints: async () => {},
-    getWriterHelpers: () => ({ executeTemplate: async () => {} })
-  } as unknown as Instance;
-}
-
-const MISSING_BLOCK: JsonRpcResponse = { result: null };
 
 afterEach(() => {
-  while (servers.length > 0) {
-    servers.pop()?.close();
+  for (const server of servers.splice(0)) {
+    server.close();
   }
+});
+
+describe('EvmProvider.getBlockHash', () => {
+  it('should throw checkpoint BlockNotFoundError when the block is missing', async () => {
+    const { params } = await createProviderFixture(MISSING_BLOCK);
+    const provider = new EvmProvider(params);
+
+    await expect(provider.getBlockHash(1000)).rejects.toBeInstanceOf(
+      BlockNotFoundError
+    );
+  });
 });
 
 describe('EvmProvider.processBlock', () => {
   it('should throw checkpoint BlockNotFoundError when the block is missing', async () => {
-    const url = await startRpcServer(MISSING_BLOCK);
-    const { lines, log } = createTestLogger();
-    const provider = new EvmProvider({
-      instance: createTestInstance(url),
-      log,
-      writers: {}
-    });
+    const { infoSpy, errorSpy, params } =
+      await createProviderFixture(MISSING_BLOCK);
+    const provider = new EvmProvider(params);
 
     await expect(provider.processBlock(1000, null)).rejects.toBeInstanceOf(
       BlockNotFoundError
     );
 
-    expect(lines).toContainEqual({ level: 'info', msg: 'block not found' });
-    expect(lines.filter(line => line.level === 'error')).toEqual([]);
+    expect(infoSpy).toHaveBeenCalledWith(
+      { blockNumber: 1000 },
+      'block not found'
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('should rethrow other block fetching errors and log them at error level', async () => {
-    const url = await startRpcServer({
+    const { errorSpy, params } = await createProviderFixture({
       error: { code: -32602, message: 'invalid params' }
     });
-    const { lines, log } = createTestLogger();
-    const provider = new EvmProvider({
-      instance: createTestInstance(url),
-      log,
-      writers: {}
-    });
+    const provider = new EvmProvider(params);
 
     await expect(provider.processBlock(1000, null)).rejects.not.toBeInstanceOf(
       BlockNotFoundError
     );
 
-    expect(lines).toContainEqual({
-      level: 'error',
-      msg: 'getting block failed... retrying'
-    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ blockNumber: 1000 }),
+      'getting block failed... retrying'
+    );
   });
 });
 
 describe('HyperSyncEvmProvider.processBlock', () => {
   it('should throw checkpoint BlockNotFoundError when the block is missing from both cache and rpc', async () => {
-    const url = await startRpcServer(MISSING_BLOCK);
-    const { lines, log } = createTestLogger();
+    const { errorSpy, params } = await createProviderFixture(MISSING_BLOCK);
     const provider = new HyperSyncEvmProvider({
-      instance: createTestInstance(url),
-      log,
-      writers: {},
+      ...params,
       apiToken: 'test-token'
     });
 
@@ -124,6 +111,6 @@ describe('HyperSyncEvmProvider.processBlock', () => {
       BlockNotFoundError
     );
 
-    expect(lines.filter(line => line.level === 'error')).toEqual([]);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

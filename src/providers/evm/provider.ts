@@ -82,9 +82,7 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getBlockHash(blockNumber: number) {
-    const block = await this.client.getBlock({
-      blockNumber: BigInt(blockNumber)
-    });
+    const block = await this.fetchBlockFromRpc(blockNumber);
 
     return block.hash;
   }
@@ -533,6 +531,10 @@ export class EvmProvider extends BaseProvider {
   }
 
   protected async fetchBlock(blockNumber: number): Promise<Block> {
+    return this.fetchBlockFromRpc(blockNumber);
+  }
+
+  private async fetchBlockFromRpc(blockNumber: number): Promise<Block> {
     try {
       return await this.client.getBlock({
         blockNumber: BigInt(blockNumber)
