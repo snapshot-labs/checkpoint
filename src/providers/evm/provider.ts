@@ -17,10 +17,17 @@ import { Block, CustomJsonRpcError, EventsData, Writer } from './types';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
-import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
+import {
+  BaseProvider,
+  BlockNotFoundError,
+  ReorgDetectedError,
+  RpcRequest,
+  RpcSelector
+} from '../base';
 
 type GetLogsBlockHashFilter = {
   blockHash: string;
+  blockNumber: number;
 };
 
 type GetLogsBlockRangeFilter = {
@@ -37,8 +44,10 @@ const CLIENT_TIMEOUT = 5 * 1000;
 const MAX_BLOCKS_PER_REQUEST = 10000;
 
 export class EvmProvider extends BaseProvider {
-  private readonly client: PublicClient;
+  private readonly rpcSelector: RpcSelector;
   private readonly maxBlocksPerRequest: number;
+  private clients = new Map<string, PublicClient>();
+  private latestBlock: { number: number; updatedAt: number } | null = null;
 
   private readonly writers: Record<string, Writer>;
   private sourceHashes = new Map<string, string>();
@@ -48,17 +57,15 @@ export class EvmProvider extends BaseProvider {
     instance,
     log,
     abis,
-    writers
+    writers,
+    rpcSelector = () => instance.config.network_node_url
   }: ConstructorParameters<typeof BaseProvider>[0] & {
     writers: Record<string, Writer>;
+    rpcSelector?: RpcSelector;
   }) {
     super({ instance, log, abis });
 
-    this.client = createPublicClient({
-      transport: http(instance.config.network_node_url, {
-        timeout: CLIENT_TIMEOUT
-      })
-    });
+    this.rpcSelector = rpcSelector;
     this.maxBlocksPerRequest =
       instance.config.max_blocks_per_request ?? MAX_BLOCKS_PER_REQUEST;
 
@@ -69,16 +76,39 @@ export class EvmProvider extends BaseProvider {
     return addresses.map(address => getAddress(address));
   }
 
+  private getRpcUrl(request: RpcRequest) {
+    return this.rpcSelector({
+      ...request,
+      latestBlock: this.latestBlock
+    });
+  }
+
+  private async getClient(request: RpcRequest): Promise<PublicClient> {
+    const url = await this.getRpcUrl(request);
+    let client = this.clients.get(url);
+
+    if (!client) {
+      client = createPublicClient({
+        transport: http(url, { timeout: CLIENT_TIMEOUT })
+      });
+      this.clients.set(url, client);
+    }
+
+    return client;
+  }
+
   async getNetworkIdentifier(): Promise<string> {
-    const chainId = await this.client.getChainId();
+    const chainId = await this.getChainId();
 
     return `evm_${chainId}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    const blockNumber = await this.client.getBlockNumber();
+    const client = await this.getClient({ type: 'getBlockNumber' });
+    const number = Number(await client.getBlockNumber());
+    this.latestBlock = { number, updatedAt: Date.now() };
 
-    return Number(blockNumber);
+    return number;
   }
 
   async getBlockHash(blockNumber: number) {
@@ -331,7 +361,8 @@ export class EvmProvider extends BaseProvider {
       }
 
       events = await this._getLogs({
-        blockHash
+        blockHash,
+        blockNumber: Number(blockNumber)
       });
     }
 
@@ -393,7 +424,13 @@ export class EvmProvider extends BaseProvider {
       params.topics = filter.topics;
     }
 
-    const res = await fetch(this.instance.config.network_node_url, {
+    const [fromBlock, toBlock] =
+      'blockHash' in filter
+        ? [filter.blockNumber, filter.blockNumber]
+        : [filter.fromBlock, filter.toBlock];
+    const url = await this.getRpcUrl({ type: 'getLogs', fromBlock, toBlock });
+
+    const res = await fetch(url, {
       method: 'POST',
       signal,
       headers: {
@@ -527,7 +564,9 @@ export class EvmProvider extends BaseProvider {
   }
 
   protected async getChainId(): Promise<number> {
-    return this.client.getChainId();
+    const client = await this.getClient({ type: 'getChainId' });
+
+    return client.getChainId();
   }
 
   protected async fetchBlock(blockNumber: number): Promise<Block> {
@@ -536,9 +575,9 @@ export class EvmProvider extends BaseProvider {
 
   private async fetchBlockFromRpc(blockNumber: number): Promise<Block> {
     try {
-      return await this.client.getBlock({
-        blockNumber: BigInt(blockNumber)
-      });
+      const client = await this.getClient({ type: 'getBlock', blockNumber });
+
+      return await client.getBlock({ blockNumber: BigInt(blockNumber) });
     } catch (err) {
       if (err instanceof ViemBlockNotFoundError) {
         throw new BlockNotFoundError();

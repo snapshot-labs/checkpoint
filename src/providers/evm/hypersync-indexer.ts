@@ -1,13 +1,16 @@
 import { Logger } from '../../utils/logger';
-import { BaseIndexer, Instance } from '../base';
+import { BaseIndexer, Instance, RpcSelector } from '../base';
 import { HyperSyncEvmProvider } from './hypersync-provider';
 import { Writer } from './types';
 
 export class HyperSyncEvmIndexer extends BaseIndexer {
   private writers: Record<string, Writer>;
-  private options: { apiToken: string };
+  private options: { apiToken: string; rpcSelector?: RpcSelector };
 
-  constructor(writers: Record<string, Writer>, options: { apiToken: string }) {
+  constructor(
+    writers: Record<string, Writer>,
+    options: { apiToken: string; rpcSelector?: RpcSelector }
+  ) {
     super();
 
     if (!options.apiToken) {
@@ -34,7 +37,8 @@ export class HyperSyncEvmIndexer extends BaseIndexer {
       log,
       abis,
       writers: this.writers,
-      apiToken: this.options.apiToken
+      apiToken: this.options.apiToken,
+      rpcSelector: this.options.rpcSelector
     });
   }
 

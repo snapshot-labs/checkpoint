@@ -133,3 +133,14 @@ export class BaseIndexer {
     throw new Error('getHandlers method was not defined');
   }
 }
+
+export type RpcRequest =
+  | { type: 'getChainId' | 'getBlockNumber' }
+  | { type: 'getBlock'; blockNumber: number }
+  | { type: 'getLogs'; fromBlock: number; toBlock: number };
+
+export type RpcSelector = (
+  context: RpcRequest & {
+    latestBlock: { number: number; updatedAt: number } | null;
+  }
+) => string | Promise<string>;

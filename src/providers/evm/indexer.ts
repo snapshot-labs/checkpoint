@@ -1,14 +1,19 @@
 import { Logger } from '../../utils/logger';
-import { BaseIndexer, Instance } from '../base';
+import { BaseIndexer, Instance, RpcSelector } from '../base';
 import { EvmProvider } from './provider';
 import { Writer } from './types';
 
 export class EvmIndexer extends BaseIndexer {
   private writers: Record<string, Writer>;
+  private options: { rpcSelector?: RpcSelector };
 
-  constructor(writers: Record<string, Writer>) {
+  constructor(
+    writers: Record<string, Writer>,
+    options: { rpcSelector?: RpcSelector } = {}
+  ) {
     super();
     this.writers = writers;
+    this.options = options;
   }
 
   init({
@@ -24,7 +29,8 @@ export class EvmIndexer extends BaseIndexer {
       instance,
       log,
       abis,
-      writers: this.writers
+      writers: this.writers,
+      rpcSelector: this.options.rpcSelector
     });
   }
 

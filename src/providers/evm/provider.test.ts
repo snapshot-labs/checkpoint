@@ -1,10 +1,10 @@
 import { createServer, Server } from 'http';
-import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { InvalidParamsRpcError } from 'viem';
 import { HyperSyncEvmProvider } from './hypersync-provider';
 import { EvmProvider } from './provider';
 import { createLogger } from '../../utils/logger';
-import { BlockNotFoundError, Instance } from '../base';
+import { BlockNotFoundError, Instance, RpcSelector } from '../base';
 
 type JsonRpcResponse = { result: unknown } | { error: unknown };
 
@@ -97,6 +97,26 @@ describe('EvmProvider.processBlock', () => {
       expect.objectContaining({ blockNumber: 1000 }),
       'getting block failed... retrying'
     );
+  });
+});
+
+describe('EvmProvider rpcSelector', () => {
+  it('should pick url per request', async () => {
+    const urlA = await startRpcServer({ result: '0x1' });
+    const urlB = await startRpcServer({ result: '0x2' });
+    const rpcSelector = mock<RpcSelector>(context =>
+      context.type === 'getBlockNumber' ? urlB : urlA
+    );
+    const provider = new EvmProvider({
+      instance: { config: { network_node_url: urlA } } as unknown as Instance,
+      log: createLogger({ level: 'silent' }),
+      writers: {},
+      rpcSelector
+    });
+
+    expect(await provider.getNetworkIdentifier()).toBe('evm_1');
+    expect(await provider.getLatestBlockNumber()).toBe(2);
+    expect(await provider.getNetworkIdentifier()).toBe('evm_1');
   });
 });
 
